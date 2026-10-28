@@ -146,3 +146,31 @@ Bildschirm bleibt während des Spiels an.
 - **Ablauf einer Änderung:** Datei ändern → lokal testen → `git add` → `git commit -m "…"` → `git push`.
   Am Handy erscheint die neue Version beim übernächsten Öffnen (der Service Worker lädt sie beim ersten
   Öffnen im Hintergrund).
+
+---
+
+## Version 2 – neuer Ablauf und neues Design
+
+**Was:** Nach deinem Feedback: Start-Knopf statt Eintippen, fester Countdown, Überspringen überall, neues
+grünes Design mit Animationen. Ideen für später stehen in `IDEEN.md`.
+
+**Konzepte:**
+- **Zustandsautomat (State Machine):** Eine Runde ist immer in genau einem Zustand: `card` → `prove` → `result`.
+  Der Timer hat eigene Unterzustände: `idle` (noch nicht gestartet), `running`, `paused`. `onRingTap()` schaut
+  nach, in welchem Zustand er ist, und wechselt in den nächsten. So kann ein Knopf drei Aufgaben haben.
+- **SVG-Ring als Timer:** Ein Kreis mit `pathLength="100"` hat für den Browser die Länge 100.
+  `stroke-dasharray: 100` macht die Linie zu einem einzigen Strich, `stroke-dashoffset` verschiebt ihn:
+  0 = voller Kreis, 100 = leer. JavaScript setzt nur diese eine Zahl, CSS animiert den Übergang.
+- **CSS-Variablen:** `--lime`, `--coral` usw. stehen einmal oben in `style.css`. Die Kategorie-Farbe wird mit
+  `style="--c: var(--gold)"` an ein Element gegeben, die CSS-Regel nutzt dann `var(--c)`.
+- **Keyframe-Animationen:** `@keyframes deal { 0% {…} 100% {…} }` beschreibt eine Bewegung. Mit
+  `replayAnimation(element, 'deal')` startet JavaScript sie neu (Klasse entfernen, neu berechnen lassen,
+  Klasse wieder setzen).
+- **3D-Karte:** `perspective` auf dem Elternelement, `transform-style: preserve-3d` auf der Karte,
+  `backface-visibility: hidden` auf beiden Seiten. Die Rückseite ist um 180° gedreht. Dreht sich die Karte,
+  sieht man erst den Rücken, dann die Vorderseite.
+- **SVG-Symbole:** Icons stehen einmal oben in `index.html` als `<symbol id="i-back">`. Überall sonst setzt
+  `<use href="#i-back"/>` eine Kopie ein.
+- **`[hidden]` und CSS:** Das Attribut `hidden` blendet aus, *außer* eine CSS-Regel setzt `display` selbst
+  (z. B. `.btn { display: inline-flex }`). Darum gibt es ganz oben `[hidden] { display: none !important; }`.
+  Diesen Fehler hat der Test gefunden: „Punktestand“ war sichtbar, obwohl keine Spieler da waren.

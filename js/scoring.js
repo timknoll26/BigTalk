@@ -1,7 +1,7 @@
 // Punkteregeln – an genau einer Stelle, damit sie leicht änderbar sind.
 //
 // Beispiele für spätere Varianten:
-//   Punkte nach Höhe des Gebots:   success: ({ bid }) => bid
+//   Wissenskarten zählen doppelt:  success: ({ card }) => (card.category === 'wissen' ? 2 : 1)
 //   Kein Abzug bei Misserfolg:      fail: () => 0
 
 export const SCORING_RULES = {
@@ -12,7 +12,7 @@ export const SCORING_RULES = {
 /**
  * Wie viele Punkte bekommt der Höchstbieter?
  * @param {boolean} success  geschafft?
- * @param {{ bid: number, card: object }} context  zusätzliche Infos für komplexere Regeln
+ * @param {{ card: object }} context  zusätzliche Infos für komplexere Regeln
  */
 export function scoreDelta(success, context) {
   return success ? SCORING_RULES.success(context) : SCORING_RULES.fail(context);

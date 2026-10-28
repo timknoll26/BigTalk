@@ -36,11 +36,11 @@ function tone({ freq, freqEnd = freq, duration = 0.15, type = 'square', volume =
 }
 
 export const sounds = {
-  bid() {
-    tone({ freq: 660, freqEnd: 990, duration: 0.08, type: 'triangle', volume: 0.3 });
-  },
-  undo() {
+  pause() {
     tone({ freq: 500, freqEnd: 300, duration: 0.1, type: 'triangle', volume: 0.25 });
+  },
+  skip() {
+    tone({ freq: 700, freqEnd: 250, duration: 0.18, type: 'triangle', volume: 0.2 });
   },
   tick() {
     tone({ freq: 1200, duration: 0.05, type: 'square', volume: 0.15 });

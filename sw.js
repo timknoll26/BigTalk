@@ -7,7 +7,7 @@
 //
 // Bei einem Release CACHE_VERSION erhöhen: Dann wird der alte Cache komplett ersetzt.
 
-const CACHE_VERSION = 'bigtalk-v1';
+const CACHE_VERSION = 'bigtalk-v2';
 
 const APP_FILES = [
   './',

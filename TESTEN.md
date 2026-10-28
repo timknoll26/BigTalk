@@ -25,3 +25,9 @@ Diese Punkte lassen sich am Desktop-Browser nicht (zuverlässig) prüfen. Bitte 
       iPhone/Safari: Teilen-Symbol → „Zum Home-Bildschirm“. Sieht das Icon gut aus? Startet die App ohne Browserleiste?
 - [ ] **Offline:** Einmal online öffnen, dann Flugmodus an, App neu starten. Läuft alles?
 - [ ] **iPhone mit Notch:** Ist oben (Pfeil-Button) und unten nichts von Notch oder Home-Leiste verdeckt?
+
+## Version 2
+- [ ] **Ablauf mit echten Leuten:** Reichen 15 Sekunden zum Überbieten? (Einstellbar 5–60 s.)
+- [ ] **Animationen flüssig?** Austeilen, Wegfliegen, Stempel, Ring. Auf älteren Handys ruckelt evtl. die 3D-Drehung.
+- [ ] **Serifenschrift auf den Karten:** Android hat kein Palatino, dort erscheint „Noto Serif“. Sieht das gut aus?
+- [ ] **Lesbarkeit auf dem Tisch:** Ist die Karte aus 1 m Entfernung lesbar?

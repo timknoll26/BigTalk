@@ -135,3 +135,43 @@ Kurzprotokoll: **was** entschieden wurde, **warum**, und welche Alternative verw
 
 **23. Kompaktere Maße für niedrige Bildschirme (`max-height: 700px`)**
 - Warum: Auf dem iPhone SE (667 px) darf während des Bietens nichts scrollen. Getestet mit allen 31 Karten.
+
+## Version 2 – nach dem ersten Feedback
+
+**24. Ein fester Countdown statt Timer-Reset bei jedem Gebot**
+- Gewählt: Karte lesen → „Start“ → die Zeit läuft einfach ab. Niemand tippt Gebote ein.
+- Warum (Feedback): Die Leute reden miteinander. Wer das Handy hält, soll nicht mittippen müssen.
+- Verworfen: (a) Weiter Gebote eintippen – lenkt ab, bremst das Gespräch. (b) Timer startet automatisch beim
+  Aufdecken – dann läuft die Zeit, während noch jemand vorliest.
+- Die alte Mechanik (Gebote eintippen, Reset pro Gebot) passt zu einer Online-Version → IDEEN.md.
+- Folge: Entscheidungen 5 und 6 (Plus-Button, Rückgängig) gelten nicht mehr. Startgebot und Mindestschritt
+  bleiben in den Kartendaten, das Startgebot steht als Orientierung auf der Karte.
+
+**25. Der Ring ist der einzige Knopf: Start, Pause, Weiter**
+- Warum: Ein großes, rundes Ziel in Daumenhöhe. Es zeigt gleichzeitig die Restzeit. Vor dem Start „atmet“ es
+  in Limette, damit klar ist: hier drücken.
+- Verworfen: Getrennter Start-Button plus Zeitanzeige – zwei Elemente für eine Sache.
+- Zusätzlich „Fertig geboten“: Wenn alle schon fertig sind, muss niemand 15 Sekunden warten.
+
+**26. Überspringen in jeder Phase, immer ohne Punkte**
+- Gewählt: „Überspringen“ auf der Karte (auch während der Timer läuft) und „Nicht machbar? Karte überspringen“
+  im Beweis.
+- Warum (Feedback): Manche Aufgaben gehen gerade nicht (kein Platz, keine Münze …). Im Beweis merkt man das oft erst.
+
+**27. Neues Design „Spieltisch“ statt Neon-Party**
+- Gewählt: Dunkelgrüner Filz, Karten aus cremefarbenem Papier mit Serifenschrift, Limette für Aktionen,
+  Koralle für Dringlichkeit. Keine Emojis, eigene schlichte SVG-Icons.
+- Warum (Feedback): Das alte Design wirkte generisch („KI-Look“): Neon-Verläufe, Leuchteffekte, schräge
+  Mehrfach-Schatten, Emojis als Icons. Ein Kartentisch passt zum Spiel und gibt den Animationen Sinn.
+- Verworfen: Helles, flaches Mintgrün – sauber, aber beliebig und wenig Partystimmung.
+- Schrift weiterhin ohne Webfonts (offline, keine fremden Server): Serifen-Systemschriften wie Palatino/Georgia
+  für Karten, Systemschrift für die Bedienung.
+
+**28. Animationen mit Bedeutung**
+- Karte wird ausgeteilt und umgedreht (neue Karte), fliegt weg (übersprungen), zittert in den letzten
+  3 Sekunden. „Beweis es!“ knallt als Stempel auf den Tisch, der Bildschirm blitzt. Haken bzw. Kreuz zeichnen
+  sich beim Ergebnis selbst.
+- Alles reine CSS-Animationen. Mit „Bewegung reduzieren“ im System werden sie abgeschaltet.
+
+**29. Neuladen: Restzeit als Pause, abgelaufene Zeit → direkt Beweis**
+- Ersetzt Nr. 4: Da der Timer nicht mehr zurückgesetzt wird, wird die echte Restzeit gemerkt (`endsAt`).

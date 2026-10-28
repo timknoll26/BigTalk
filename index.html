@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <!-- viewport-fit=cover: nutzt auch den Bereich neben der iPhone-Notch -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b0820">
+  <meta name="theme-color" content="#0c3326">
   <meta name="description" content="Big Talk – das Überbiet-Partyspiel für ein Handy.">
   <title>Big Talk</title>
   <link rel="manifest" href="manifest.webmanifest">
@@ -21,63 +21,172 @@
   <script type="module" src="js/app.js"></script>
 </head>
 <body>
+  <!-- Wiederverwendbare Icons. <use href="#i-back"> setzt eines davon ein. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-scores" viewBox="0 0 24 24"><path d="M5 20V11M12 20V4M19 20v-6" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-skip" viewBox="0 0 24 24"><path d="M5 6l8 6-8 6zM16 6v12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-cards" viewBox="0 0 24 24"><rect x="7" y="3" width="12" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4.5 7.5V18a3 3 0 0 0 3 3H15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="16" cy="7" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="10" cy="17" r="2.3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </svg>
+
   <main id="app">
 
     <!-- ============ START ============ -->
     <section id="screen-start" class="screen">
-      <h1 class="logo" aria-label="Big Talk">
-        <span class="logo-big">Big</span>
-        <span class="logo-talk">Talk</span>
-      </h1>
-      <p class="tagline">Große Klappe? Beweis es!</p>
+      <div class="hero">
+        <div class="fan" aria-hidden="true">
+          <span class="fan-card" style="--c: var(--gold)"></span>
+          <span class="fan-card" style="--c: var(--sky)"></span>
+          <span class="fan-card" style="--c: var(--coral)"><span class="fan-q">?</span></span>
+        </div>
+        <h1 class="logo"><span class="logo-big">Big</span> <span class="logo-talk">Talk</span></h1>
+        <p class="tagline">Große Klappe? Beweis es.</p>
+      </div>
 
       <button id="btn-start" class="btn btn-primary btn-xl" type="button">Los geht's</button>
-      <button id="btn-scores-start" class="btn btn-ghost" type="button">🏆 Punktestand</button>
+      <button id="btn-scores-start" class="btn btn-ghost" type="button">
+        <svg class="icon"><use href="#i-scores"/></svg> Punktestand
+      </button>
 
       <!-- Kategorien: Tippen schaltet an/aus (aria-pressed) -->
       <div id="category-toggles" class="category-toggles" role="group" aria-label="Kategorien"></div>
 
       <details id="panel-players" class="panel">
-        <summary>Spieler <span id="players-count" class="count"></span></summary>
+        <summary>Spieler <span id="players-count" class="count"></span><svg class="icon chevron"><use href="#i-chevron"/></svg></summary>
         <p class="hint">Optional – nur für den Punktestand. Ohne Spieler wird ohne Punkte gespielt.</p>
         <ul id="players-list" class="players-list"></ul>
         <form id="form-player" class="inline-form" novalidate>
           <input id="input-player" type="text" maxlength="16" placeholder="Name eingeben"
                  autocomplete="off" autocapitalize="words" enterkeyhint="done" aria-label="Spielername">
-          <button class="btn btn-primary" type="submit" aria-label="Spieler hinzufügen">+</button>
+          <button class="btn btn-lime" type="submit" aria-label="Spieler hinzufügen">+</button>
         </form>
         <p id="player-error" class="form-error" hidden></p>
       </details>
 
       <details class="panel">
-        <summary>Kurzregeln</summary>
+        <summary>So geht's<svg class="icon chevron"><use href="#i-chevron"/></svg></summary>
         <ol class="rules">
-          <li>Das Handy zeigt eine Challenge, z.&nbsp;B. „Wie viele Liegestütze schaffst du?“</li>
-          <li>Alle überbieten sich lautstark. Wer das Handy hält, tippt jedes neue Gebot mit <b>+</b> ein.</li>
-          <li>Jedes Gebot setzt den Timer zurück. Bietet niemand mehr, läuft er ab.</li>
-          <li>Der Höchstbieter muss <b>sofort</b> beweisen, dass er es schafft. Die Gruppe entscheidet.</li>
+          <li>Lest die Karte vor. Haben alle sie verstanden, drückt ihr <b>Start</b>.</li>
+          <li>15 Sekunden lang überbietet ihr euch – einfach laut reden, niemand muss etwas eintippen.</li>
+          <li>Ist die Zeit um, muss der Höchstbieter <b>sofort</b> beweisen, dass er es schafft.</li>
+          <li>Die Gruppe entscheidet: geschafft oder nicht? Geht eine Karte gerade nicht, überspringt sie.</li>
         </ol>
       </details>
 
       <div class="start-links">
-        <button id="btn-open-cards" class="btn btn-ghost" type="button">🃏 Eigene Karten</button>
-        <button id="btn-open-settings" class="btn btn-ghost" type="button">⚙️ Einstellungen</button>
+        <button id="btn-open-cards" class="btn btn-ghost" type="button"><svg class="icon"><use href="#i-cards"/></svg> Eigene Karten</button>
+        <button id="btn-open-settings" class="btn btn-ghost" type="button"><svg class="icon"><use href="#i-settings"/></svg> Einstellungen</button>
       </div>
+    </section>
+
+    <!-- ============ KARTE + TIMER ============ -->
+    <section id="screen-card" class="screen">
+      <header class="topbar">
+        <button id="btn-home" class="icon-btn" type="button" aria-label="Zum Startbildschirm"><svg class="icon"><use href="#i-back"/></svg></button>
+        <span id="deck-info" class="topbar-info"></span>
+        <button id="btn-scores" class="icon-btn" type="button" aria-label="Punktestand"><svg class="icon"><use href="#i-scores"/></svg></button>
+      </header>
+
+      <div class="card-stage">
+        <!-- Die Karte hat Vorder- und Rückseite, damit sie beim Austeilen umgedreht werden kann -->
+        <article id="play-card" class="card">
+          <div class="card-face card-front">
+            <div class="card-cat"><span id="pc-dot" class="dot"></span><span id="pc-cat"></span></div>
+            <p id="pc-text" class="card-text"></p>
+            <p id="pc-meta" class="card-meta"></p>
+          </div>
+          <div class="card-face card-back" aria-hidden="true"><span>Big Talk</span></div>
+        </article>
+      </div>
+
+      <!-- Der Ring ist Start-, Pause- und Weiter-Knopf zugleich -->
+      <button id="round-ring" class="ring" type="button">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring-track" cx="60" cy="60" r="52"/>
+          <circle id="round-ring-progress" class="ring-progress" cx="60" cy="60" r="52" pathLength="100"/>
+        </svg>
+        <span class="ring-center">
+          <span id="round-ring-value" class="ring-value"></span>
+          <span id="round-ring-sub" class="ring-sub"></span>
+        </span>
+      </button>
+
+      <div class="round-actions">
+        <button id="btn-skip" class="btn btn-ghost" type="button"><svg class="icon"><use href="#i-skip"/></svg> Überspringen</button>
+        <button id="btn-finish" class="btn btn-ghost" type="button">Fertig geboten</button>
+      </div>
+    </section>
+
+    <!-- ============ BEWEIS ============ -->
+    <section id="screen-prove" class="screen">
+      <div id="flash" class="flash" aria-hidden="true"></div>
+      <!-- Oberer Teil bleibt mittig, Urteils-Buttons sitzen unten am Daumen -->
+      <div class="prove-main">
+      <h2 id="stamp" class="stamp">Beweis es!</h2>
+
+      <article class="card card-mini">
+        <div class="card-face card-front">
+          <div class="card-cat"><span id="pv-dot" class="dot"></span><span id="pv-cat"></span></div>
+          <p id="pv-text" class="card-text"></p>
+        </div>
+      </article>
+
+      <!-- Nur mit Spielern: Wer muss liefern? -->
+      <div id="prove-bidder" class="bidder-pick">
+        <p class="bidder-question">Wer hat am höchsten geboten?</p>
+        <div id="bidder-buttons" class="bidder-buttons"></div>
+        <button id="btn-no-score" class="btn btn-link" type="button">Ohne Wertung weiter</button>
+      </div>
+      <button id="prove-who" class="prove-who" type="button" aria-label="Höchstbieter ändern"></button>
+
+      <button id="proof-ring" class="ring ring-small" type="button">
+        <svg viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring-track" cx="60" cy="60" r="52"/>
+          <circle id="proof-ring-progress" class="ring-progress" cx="60" cy="60" r="52" pathLength="100"/>
+        </svg>
+        <span class="ring-center">
+          <span id="proof-ring-value" class="ring-value"></span>
+          <span id="proof-ring-sub" class="ring-sub"></span>
+        </span>
+      </button>
+      </div>
+
+      <div id="verdict" class="verdict">
+        <button id="btn-fail" class="btn btn-fail" type="button">Nicht geschafft</button>
+        <button id="btn-success" class="btn btn-success" type="button">Geschafft</button>
+      </div>
+      <button id="btn-skip-prove" class="btn btn-link" type="button">Nicht machbar? Karte überspringen</button>
+    </section>
+
+    <!-- ============ ERGEBNIS ============ -->
+    <section id="screen-result" class="screen">
+      <svg id="result-mark" class="result-mark" viewBox="0 0 120 120" aria-hidden="true">
+        <circle class="mark-circle" cx="60" cy="60" r="52" pathLength="100"/>
+        <path id="mark-path" class="mark-path" pathLength="100"/>
+      </svg>
+      <h2 id="result-title" class="result-title"></h2>
+      <p id="result-points" class="result-points"></p>
+      <ol id="result-scores" class="scoreboard"></ol>
+      <button id="btn-next" class="btn btn-primary btn-xl" type="button">Nächste Karte</button>
+      <button id="btn-revert" class="btn btn-link" type="button">Falsch getippt? Ergebnis ändern</button>
     </section>
 
     <!-- ============ EINSTELLUNGEN ============ -->
     <section id="screen-settings" class="screen">
       <header class="topbar">
-        <button class="icon-btn" type="button" data-home aria-label="Zurück">←</button>
+        <button class="icon-btn" type="button" data-home aria-label="Zurück"><svg class="icon"><use href="#i-back"/></svg></button>
         <h2 class="topbar-title">Einstellungen</h2>
       </header>
 
       <div class="setting">
-        <span class="setting-label">Timer pro Gebot</span>
+        <span class="setting-label">Zeit zum Bieten</span>
         <div class="stepper">
-          <button id="btn-timer-down" class="btn btn-side" type="button" aria-label="Timer kürzer">−</button>
+          <button id="btn-timer-down" class="btn btn-ghost" type="button" aria-label="Kürzer">−</button>
           <output id="timer-setting" class="stepper-value" aria-live="polite"></output>
-          <button id="btn-timer-up" class="btn btn-side" type="button" aria-label="Timer länger">+</button>
+          <button id="btn-timer-up" class="btn btn-ghost" type="button" aria-label="Länger">+</button>
         </div>
       </div>
 
@@ -87,18 +196,18 @@
       </label>
 
       <label class="setting setting-row">
-        <span class="setting-label">Vibration <small id="vibration-note" class="hint" hidden>(von diesem Gerät nicht unterstützt)</small></span>
+        <span class="setting-label">Vibration <small id="vibration-note" class="hint" hidden>Von diesem Gerät nicht unterstützt</small></span>
         <input id="toggle-vibration" class="switch" type="checkbox">
       </label>
 
-      <button id="btn-test-sound" class="btn btn-ghost" type="button">🔊 Ton &amp; Vibration testen</button>
+      <button id="btn-test-sound" class="btn btn-ghost" type="button">Ton &amp; Vibration testen</button>
       <button id="btn-reset-settings" class="btn btn-ghost btn-danger" type="button">Spiel zurücksetzen</button>
     </section>
 
     <!-- ============ EIGENE KARTEN ============ -->
     <section id="screen-cards" class="screen">
       <header class="topbar">
-        <button class="icon-btn" type="button" data-home aria-label="Zurück">←</button>
+        <button class="icon-btn" type="button" data-home aria-label="Zurück"><svg class="icon"><use href="#i-back"/></svg></button>
         <h2 class="topbar-title">Eigene Karten</h2>
       </header>
 
@@ -117,14 +226,10 @@
             <input id="card-unit" type="text" maxlength="20" placeholder="z. B. Sekunden">
           </label>
         </div>
-        <div class="field-row field-row-3">
+        <div class="field-row">
           <label class="field">
-            <span>Startwert</span>
+            <span>Startgebot</span>
             <input id="card-start" type="number" inputmode="numeric" min="1" value="1">
-          </label>
-          <label class="field">
-            <span>Schritt</span>
-            <input id="card-step" type="number" inputmode="numeric" min="1" value="1">
           </label>
           <label class="field">
             <span>Beweiszeit (s)</span>
@@ -140,99 +245,15 @@
       <p id="custom-empty" class="hint">Noch keine eigenen Karten.</p>
     </section>
 
-    <!-- ============ BIETEN ============ -->
-    <section id="screen-bid" class="screen">
-      <header class="topbar">
-        <button id="btn-home" class="icon-btn" type="button" aria-label="Zum Startbildschirm">←</button>
-        <span id="bid-category" class="chip"></span>
-        <span class="topbar-spacer"></span>
-        <button id="btn-scores" class="icon-btn" type="button" aria-label="Punktestand">🏆</button>
-      </header>
-
-      <p id="bid-card" class="card-text"></p>
-
-      <!-- Tippen auf die Zahl öffnet die Direkteingabe -->
-      <button id="bid-display" class="bid-display" type="button" aria-label="Gebot direkt eingeben">
-        <span id="bid-label" class="bid-label"></span>
-        <span id="bid-value" class="bid-value"></span>
-        <span id="bid-unit" class="bid-unit"></span>
-      </button>
-
-      <button id="timer" class="timer" type="button" aria-label="Timer pausieren oder fortsetzen">
-        <span id="timer-value" class="timer-value"></span>
-        <span class="timer-bar"><span id="timer-fill" class="timer-fill"></span></span>
-        <span id="timer-caption" class="timer-caption"></span>
-      </button>
-
-      <div class="bid-controls">
-        <button id="btn-undo" class="btn btn-side" type="button" aria-label="Letztes Gebot zurücknehmen">↶</button>
-        <button id="btn-plus" class="btn btn-plus" type="button" aria-label="Gebot erhöhen">+</button>
-        <button id="btn-plus5" class="btn btn-side" type="button" aria-label="Großer Sprung"></button>
-      </div>
-      <button id="btn-skip" class="btn btn-link" type="button">Karte überspringen</button>
-    </section>
-
-    <!-- ============ BEWEIS ============ -->
-    <section id="screen-prove" class="screen">
-      <h2 class="prove-title">Beweis es!</h2>
-      <div class="prove-bid">
-        <span id="prove-value" class="prove-value"></span>
-        <span id="prove-unit" class="prove-unit"></span>
-      </div>
-      <p id="prove-card" class="card-text card-text-small"></p>
-
-      <!-- Nur mit Spielern: Wer muss liefern? -->
-      <div id="prove-bidder" class="bidder-pick">
-        <p class="bidder-question">Wer hat am höchsten geboten?</p>
-        <div id="bidder-buttons" class="bidder-buttons"></div>
-        <button id="btn-no-score" class="btn btn-link" type="button">Ohne Wertung weiter</button>
-      </div>
-      <button id="prove-who" class="prove-who" type="button" aria-label="Höchstbieter ändern"></button>
-
-      <div id="proof-timer" class="proof-timer">
-        <span id="proof-time" class="proof-time"></span>
-        <button id="btn-proof-start" class="btn btn-primary btn-xl" type="button">▶ Beweis starten</button>
-      </div>
-
-      <div id="verdict" class="verdict">
-        <button id="btn-success" class="btn btn-success" type="button">✔ Geschafft</button>
-        <button id="btn-fail" class="btn btn-fail" type="button">✘ Nicht geschafft</button>
-      </div>
-    </section>
-
-    <!-- ============ ERGEBNIS ============ -->
-    <section id="screen-result" class="screen">
-      <div id="result-icon" class="result-icon"></div>
-      <h2 id="result-title" class="result-title"></h2>
-      <p id="result-detail" class="result-detail"></p>
-      <p id="result-points" class="result-points"></p>
-      <ol id="result-scores" class="scoreboard"></ol>
-      <button id="btn-next" class="btn btn-primary btn-xl" type="button">Nächste Karte</button>
-      <button id="btn-revert" class="btn btn-link" type="button">Falsch getippt? Ergebnis ändern</button>
-    </section>
-
   </main>
-
-  <!-- Direkteingabe eines Gebots -->
-  <dialog id="dlg-bid" class="dialog">
-    <form id="form-bid" method="dialog" novalidate>
-      <h3>Gebot eingeben</h3>
-      <input id="input-bid" type="number" inputmode="numeric" min="0" step="1" required>
-      <p id="bid-error" class="form-error" hidden></p>
-      <div class="dialog-actions">
-        <button class="btn btn-ghost" type="button" data-close>Abbrechen</button>
-        <button class="btn btn-primary" type="submit">Bieten</button>
-      </div>
-    </form>
-  </dialog>
 
   <!-- Punktestand -->
   <dialog id="dlg-scores" class="dialog">
-    <h3>🏆 Punktestand</h3>
+    <h3>Punktestand</h3>
     <ol id="scores-list" class="scoreboard"></ol>
     <p id="scores-empty" class="hint" hidden>Noch keine Spieler. Füge auf dem Startbildschirm welche hinzu.</p>
     <div class="dialog-actions">
-      <button id="btn-reset" class="btn btn-ghost" type="button">Spiel zurücksetzen</button>
+      <button id="btn-reset" class="btn btn-ghost btn-danger" type="button">Zurücksetzen</button>
       <button class="btn btn-primary" type="button" data-close>Schließen</button>
     </div>
   </dialog>

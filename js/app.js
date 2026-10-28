@@ -3,6 +3,9 @@
 //
 // Grundprinzip: Ein Event-Handler ändert `state` und ruft dann render() auf.
 // render() speichert den Zustand und passt das HTML an.
+//
+// Ablauf einer Runde:
+//   card (Timer idle → running ⇄ paused) ──Zeit um──► prove ──Urteil──► result ──► nächste Karte
 
 import { DEFAULT_CARDS, CATEGORIES } from './cards.js';
 import { drawCard } from './deck.js';
@@ -18,6 +21,7 @@ const NO_SCORE = 'none'; // bidderId, wenn bewusst ohne Wertung gespielt wird
 const TIMER_MIN = 5;
 const TIMER_MAX = 60;
 const TIMER_STEP = 5;
+const TOSS_MS = 320; // Dauer der Wegflieg-Animation beim Überspringen (siehe .toss in style.css)
 
 // ---------- Zustand ----------
 const DEFAULT_SETTINGS = {
@@ -34,24 +38,24 @@ settings.categories = settings.categories.filter((id) => CATEGORIES.some((c) => 
 if (settings.categories.length === 0) settings.categories = DEFAULT_SETTINGS.categories;
 
 let customCards = load('customCards', []);
+let players = load('players', []); // [{ id, name, score }]
 
 const state = {
   screen: 'start', // 'start' | 'game' | 'settings' | 'cards'
   deck: [], // noch nicht gespielte Karten-IDs
   lastCardId: null,
   // Die laufende Runde (oder null):
-  // { cardId, phase: 'bid'|'prove'|'result', bids: [], pausedMs: null|Zahl,
+  // { cardId, phase: 'card'|'prove'|'result',
+  //   timer: 'idle'|'running'|'paused', endsAt: null|Zeitstempel, remainingMs: null|Zahl,
   //   proofState: 'idle'|'running'|'done', bidderId: null|'none'|Spieler-ID,
   //   success: null|true|false, delta: null|Zahl }
   round: null,
 };
 
-let players = load('players', []); // [{ id, name, score }]
-
 // ---------- Hilfsfunktionen ----------
 const $ = (id) => document.getElementById(id);
 
-const bidMs = () => settings.timerSeconds * 1000;
+const roundMs = () => settings.timerSeconds * 1000;
 
 function allCards() {
   return [...DEFAULT_CARDS, ...customCards];
@@ -70,35 +74,26 @@ function currentCard() {
   return state.round && findCard(state.round.cardId);
 }
 
-function currentBid() {
-  const bids = state.round.bids;
-  return bids.length ? bids[bids.length - 1] : null;
-}
-
-/** Kleinstes Gebot, das jetzt erlaubt ist. */
-function minNextBid(card) {
-  const bid = currentBid();
-  return bid === null ? card.start : bid + card.step;
-}
-
 function findPlayer(id) {
   return players.find((p) => p.id === id);
 }
 
-function categoryLabel(id) {
-  const cat = CATEGORIES.find((c) => c.id === id);
-  return cat ? `${cat.emoji} ${cat.name}` : id;
+function category(id) {
+  return CATEGORIES.find((c) => c.id === id) ?? { name: id, color: 'muted' };
 }
 
 /** Erzeugt ein Element. Text immer über textContent, nie innerHTML – so kann ein Name kein HTML einschleusen. */
-function el(tag, { className, text, attrs } = {}, children = []) {
+function el(tag, { className, text, attrs, style } = {}, children = []) {
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   if (attrs) Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, v));
+  if (style) node.setAttribute('style', style);
   children.forEach((c) => node.append(c));
   return node;
 }
+
+const categoryDot = (catId) => el('span', { className: 'dot', style: `--c: var(--${category(catId).color})` });
 
 let toastTimeout = null;
 function toast(message) {
@@ -136,7 +131,7 @@ function saveSettings() {
   setVibrationEnabled(settings.vibration);
 }
 
-/** Stellt nach dem Neuladen den letzten Stand her – laufende Timer werden zu Pausen. */
+/** Stellt nach dem Neuladen den letzten Stand her – ein laufender Timer wird zur Pause. */
 function restoreGame() {
   const saved = load('game', null);
   if (!saved) return;
@@ -147,35 +142,48 @@ function restoreGame() {
 
   const r = state.round;
   if (!r) return;
-  if (!findCard(r.cardId)) {
-    // Karte gibt es nicht mehr (z. B. eigene Karte gelöscht).
+  // Karte gelöscht oder Spielstand aus einer älteren Version → Runde verwerfen.
+  if (!findCard(r.cardId) || !['card', 'prove', 'result'].includes(r.phase)) {
     state.round = null;
     state.screen = 'start';
     return;
   }
-  if (r.phase === 'bid' && r.bids.length > 0) r.pausedMs = bidMs();
+  if (r.phase === 'card' && r.timer === 'running') {
+    const left = (r.endsAt ?? 0) - Date.now();
+    if (left > 1000) {
+      // Restzeit merken, aber nicht ungefragt weiterlaufen lassen.
+      r.timer = 'paused';
+      r.remainingMs = left;
+      r.endsAt = null;
+    } else {
+      // Die Zeit ist abgelaufen, während die Seite zu war.
+      enterProve(r);
+    }
+  }
   if (r.phase === 'prove' && r.proofState === 'running') r.proofState = 'idle';
 }
 
 // ---------- Timer ----------
 let lastWholeSecond = null;
 
-const bidTimer = new Countdown({
+const roundTimer = new Countdown({
   onTick(ms) {
-    renderTimer(ms);
+    renderRoundRing(ms);
     // In den letzten 5 Sekunden jede volle Sekunde ticken.
     const s = Math.ceil(ms / 1000);
     if (s !== lastWholeSecond && s > 0 && s <= 5) {
       sounds.tick();
       vibrate(40);
+      replayAnimation($('round-ring-value'), 'beat');
+      if (s <= 3) replayAnimation($('play-card'), 'nervous');
     }
     lastWholeSecond = s;
   },
-  onEnd: onBidTimeUp,
+  onEnd: onTimeUp,
 });
 
 const proofTimer = new Countdown({
-  onTick: renderProofTime,
+  onTick: renderProofRing,
   onEnd() {
     state.round.proofState = 'done';
     sounds.timeUp();
@@ -184,10 +192,13 @@ const proofTimer = new Countdown({
   },
 });
 
-function startBidTimer(ms = bidMs()) {
-  state.round.pausedMs = null;
+function runRoundTimer(ms) {
+  const r = state.round;
+  r.timer = 'running';
+  r.remainingMs = null;
+  r.endsAt = Date.now() + ms; // nur fürs Wiederherstellen nach dem Neuladen
   lastWholeSecond = null;
-  bidTimer.start(ms);
+  roundTimer.start(ms);
 }
 
 // ---------- Aktionen: Spielablauf ----------
@@ -201,7 +212,7 @@ function startGame() {
 }
 
 function nextCard() {
-  bidTimer.stop();
+  roundTimer.stop();
   proofTimer.stop();
   const result = drawCard(state.deck, playableCards(), state.lastCardId);
   if (!result.card) {
@@ -216,9 +227,10 @@ function nextCard() {
   state.lastCardId = result.card.id;
   state.round = {
     cardId: result.card.id,
-    phase: 'bid',
-    bids: [],
-    pausedMs: null,
+    phase: 'card',
+    timer: 'idle',
+    endsAt: null,
+    remainingMs: null,
     proofState: 'idle',
     bidderId: null,
     success: null,
@@ -226,57 +238,66 @@ function nextCard() {
   };
   state.screen = 'game';
   render();
+  const cardEl = $('play-card');
+  cardEl.classList.remove('toss');
+  replayAnimation(cardEl, 'deal');
 }
 
-function placeBid(value) {
-  state.round.bids.push(value);
-  startBidTimer();
-  sounds.bid();
-  vibrate(25);
-  render();
-  replayAnimation($('bid-value'), 'bump');
-}
-
-/** Erhöht um `steps` Mindestschritte. Das erste Gebot ist immer mindestens der Startwert. */
-function raise(steps) {
-  const card = currentCard();
-  const bid = currentBid();
-  const value = bid === null ? card.start + (steps - 1) * card.step : bid + steps * card.step;
-  placeBid(value);
-}
-
-function undo() {
+/** Ein Knopf für alles: starten, pausieren, weiter. */
+function onRingTap() {
   const r = state.round;
-  if (r.bids.length === 0) return;
-  r.bids.pop();
-  if (r.bids.length === 0) {
-    // Kein Gebot mehr → zurück in den Wartezustand.
-    bidTimer.stop();
-    r.pausedMs = null;
-  }
-  sounds.undo();
-  render();
-}
-
-function togglePause() {
-  const r = state.round;
-  if (r.bids.length === 0) return;
-  if (bidTimer.running) {
-    r.pausedMs = bidTimer.remaining();
-    bidTimer.stop();
+  if (r.timer === 'idle') {
+    unlockAudio();
+    sounds.go();
+    vibrate(60);
+    runRoundTimer(roundMs());
+  } else if (r.timer === 'running') {
+    r.remainingMs = roundTimer.remaining();
+    r.endsAt = null;
+    r.timer = 'paused';
+    roundTimer.stop();
+    sounds.pause();
   } else {
-    startBidTimer(r.pausedMs ?? bidMs());
+    runRoundTimer(r.remainingMs ?? roundMs());
   }
   render();
+}
+
+/** Alle sind fertig mit Bieten, bevor die Zeit um ist. */
+function finishEarly() {
+  if (state.round.timer === 'idle') return;
+  roundTimer.stop();
+  onTimeUp();
+}
+
+let skipping = false;
+/** Karte geht gerade nicht → ohne Punkte zur nächsten. Mit Wegflieg-Animation, wenn die Karte sichtbar ist. */
+function skipCard() {
+  if (skipping) return;
+  roundTimer.stop();
+  proofTimer.stop();
+  sounds.skip();
+  if (state.round?.phase !== 'card') {
+    nextCard();
+    return;
+  }
+  skipping = true;
+  replayAnimation($('play-card'), 'toss');
+  setTimeout(() => {
+    skipping = false;
+    nextCard();
+  }, TOSS_MS);
 }
 
 /** Pausiert alles, was gerade läuft – z. B. beim Verlassen des Spielbildschirms. */
 function pauseRunning() {
   const r = state.round;
   if (!r) return;
-  if (bidTimer.running) {
-    r.pausedMs = bidTimer.remaining();
-    bidTimer.stop();
+  if (roundTimer.running) {
+    r.remainingMs = roundTimer.remaining();
+    r.endsAt = null;
+    r.timer = 'paused';
+    roundTimer.stop();
   }
   if (proofTimer.running) {
     // Ein unterbrochener Beweis muss neu gestartet werden.
@@ -291,21 +312,24 @@ function goHome() {
   render();
 }
 
-function skipCard() {
-  if (state.round.bids.length > 0) return;
-  nextCard();
-}
-
-function onBidTimeUp() {
-  const r = state.round;
+/** Setzt eine Runde in die Beweis-Phase (ohne Ton/Animation – das macht onTimeUp). */
+function enterProve(r) {
   r.phase = 'prove';
+  r.timer = 'idle';
+  r.endsAt = null;
+  r.remainingMs = null;
   r.proofState = 'idle';
   r.bidderId = null;
+}
+
+function onTimeUp() {
+  enterProve(state.round);
   sounds.timeUp();
   vibrate([500, 150, 500, 150, 800]);
   render();
-  // Wackel-Animation nur beim echten Ablauf, nicht beim Zurückkehren.
-  replayAnimation($('screen-prove'), 'alarm');
+  // Stempel und Blitz nur beim echten Ablauf, nicht beim Zurückkehren.
+  replayAnimation($('stamp'), 'slam');
+  replayAnimation($('flash'), 'go');
 }
 
 function chooseBidder(id) {
@@ -320,32 +344,33 @@ function changeBidder() {
   render();
 }
 
-function startProof() {
-  const card = currentCard();
-  state.round.proofState = 'running';
+function onProofRingTap() {
+  const r = state.round;
+  if (r.proofState !== 'idle') return;
+  r.proofState = 'running';
   sounds.go();
   vibrate(100);
-  proofTimer.start(card.proofSeconds * 1000);
+  proofTimer.start(currentCard().proofSeconds * 1000);
   render();
 }
 
 function finishRound(success) {
   proofTimer.stop();
   const r = state.round;
-  const card = currentCard();
   r.success = success;
   r.phase = 'result';
   r.delta = null;
 
   const player = findPlayer(r.bidderId);
   if (player) {
-    r.delta = scoreDelta(success, { bid: currentBid(), card });
+    r.delta = scoreDelta(success, { card: currentCard() });
     player.score += r.delta;
     savePlayers();
   }
   success ? sounds.success() : sounds.fail();
   vibrate(success ? [80, 60, 80] : 400);
   render();
+  replayAnimation($('result-mark'), 'draw');
 }
 
 /** Falls aus Versehen der falsche Ergebnis-Button getippt wurde. */
@@ -392,7 +417,7 @@ function removePlayer(id) {
 }
 
 function resetGame() {
-  bidTimer.stop();
+  roundTimer.stop();
   proofTimer.stop();
   players.forEach((p) => (p.score = 0));
   savePlayers();
@@ -461,14 +486,12 @@ function addCustomCard(event) {
   const text = $('card-text').value.trim().replace(/\s+/g, ' ');
   const unit = $('card-unit').value.trim();
   const start = readInt('card-start');
-  const step = readInt('card-step');
   const proof = readInt('card-proof');
 
   const problem =
     (!text && 'Bitte eine Challenge eingeben.') ||
     (!unit && 'Bitte eine Einheit eingeben (z. B. „Sekunden“).') ||
-    ((!Number.isInteger(start) || start < 1) && 'Startwert muss eine ganze Zahl ab 1 sein.') ||
-    ((!Number.isInteger(step) || step < 1) && 'Schritt muss eine ganze Zahl ab 1 sein.') ||
+    ((!Number.isInteger(start) || start < 1) && 'Startgebot muss eine ganze Zahl ab 1 sein.') ||
     (proof !== null && (!Number.isInteger(proof) || proof < 5 || proof > 600) && 'Beweiszeit: 5 bis 600 Sekunden oder leer lassen.');
   if (problem) {
     $('card-error').textContent = problem;
@@ -482,7 +505,7 @@ function addCustomCard(event) {
     text,
     unit,
     start,
-    step,
+    step: 1,
   };
   if (proof !== null) card.proofSeconds = proof;
   customCards.push(card);
@@ -491,11 +514,7 @@ function addCustomCard(event) {
   $('form-card').reset();
   $('card-category').value = card.category; // Kategorie für die nächste Karte beibehalten
   $('card-error').hidden = true;
-  if (!settings.categories.includes(card.category)) {
-    toast('Gespeichert – Kategorie ist aber gerade ausgeschaltet.');
-  } else {
-    toast('Karte gespeichert!');
-  }
+  toast(settings.categories.includes(card.category) ? 'Karte gespeichert!' : 'Gespeichert – Kategorie ist aber gerade aus.');
   render();
 }
 
@@ -512,42 +531,6 @@ function deleteCustomCard(id) {
 }
 
 // ---------- Dialoge ----------
-let resumeAfterDialogMs = null;
-
-function openBidDialog() {
-  const card = currentCard();
-  // Während getippt wird, darf der Timer nicht ablaufen.
-  resumeAfterDialogMs = bidTimer.running ? bidTimer.remaining() : null;
-  bidTimer.stop();
-  const input = $('input-bid');
-  input.min = minNextBid(card);
-  input.value = minNextBid(card);
-  $('bid-error').hidden = true;
-  $('dlg-bid').showModal();
-  input.select();
-}
-
-function closeBidDialog(submitted) {
-  $('dlg-bid').close();
-  if (!submitted && resumeAfterDialogMs !== null) startBidTimer(resumeAfterDialogMs);
-  resumeAfterDialogMs = null;
-  render();
-}
-
-function submitBidDialog(event) {
-  event.preventDefault();
-  const card = currentCard();
-  const value = Number($('input-bid').value);
-  const min = minNextBid(card);
-  if (!Number.isInteger(value) || value < min) {
-    $('bid-error').textContent = `Mindestens ${min} ${card.unit}.`;
-    $('bid-error').hidden = false;
-    return;
-  }
-  closeBidDialog(true);
-  placeBid(value);
-}
-
 function openScores() {
   renderScoreboard($('scores-list'));
   $('scores-empty').hidden = players.length > 0;
@@ -573,6 +556,7 @@ function showScreen(id) {
 function render() {
   saveGame(); // jede Änderung landet sofort im Speicher
   keepAwake(state.screen === 'game'); // Bildschirm nur während des Spiels wach halten
+
   if (state.screen === 'settings' || state.screen === 'cards') {
     state.screen === 'settings' ? renderSettings() : renderCards();
     showScreen(`screen-${state.screen}`);
@@ -584,7 +568,7 @@ function render() {
     return;
   }
   const phase = state.round.phase;
-  if (phase === 'bid') renderBid();
+  if (phase === 'card') renderCard();
   if (phase === 'prove') renderProve();
   if (phase === 'result') renderResult();
   showScreen(`screen-${phase}`);
@@ -593,10 +577,9 @@ function render() {
 function renderStart() {
   $('btn-start').textContent = state.round ? 'Weiterspielen' : "Los geht's";
   $('btn-scores-start').hidden = players.length === 0;
-  $('players-count').textContent = players.length ? `(${players.length})` : '– optional';
+  $('players-count').textContent = players.length ? String(players.length) : 'optional';
 
-  const list = $('players-list');
-  list.replaceChildren(
+  $('players-list').replaceChildren(
     ...players.map((p) => {
       const remove = el('button', { text: '×', attrs: { type: 'button', 'aria-label': `${p.name} entfernen` } });
       remove.addEventListener('click', () => removePlayer(p.id));
@@ -609,8 +592,7 @@ function renderStart() {
       const count = allCards().filter((c) => c.category === cat.id).length;
       const on = settings.categories.includes(cat.id);
       const b = el('button', { className: 'cat-toggle', attrs: { type: 'button', 'aria-pressed': String(on) } }, [
-        el('span', { className: 'emoji', text: cat.emoji }),
-        el('span', { text: cat.name }),
+        el('span', { className: 'cat-name' }, [categoryDot(cat.id), el('span', { text: cat.name })]),
         el('small', { text: `${count} Karten` }),
       ]);
       b.addEventListener('click', () => toggleCategory(cat.id));
@@ -619,85 +601,57 @@ function renderStart() {
   );
 }
 
-function renderSettings() {
-  $('timer-setting').textContent = `${settings.timerSeconds} s`;
-  $('btn-timer-down').disabled = settings.timerSeconds <= TIMER_MIN;
-  $('btn-timer-up').disabled = settings.timerSeconds >= TIMER_MAX;
-  $('toggle-sound').checked = settings.sound;
-  $('toggle-vibration').checked = settings.vibration;
-  $('vibration-note').hidden = 'vibrate' in navigator;
+/** Befüllt eine Karte (Spielkarte „pc“ oder Mini-Karte „pv“). */
+function fillCard(prefix, card) {
+  const cat = category(card.category);
+  $(`${prefix}-dot`).style.setProperty('--c', `var(--${cat.color})`);
+  $(`${prefix}-cat`).textContent = cat.name;
+  $(`${prefix}-text`).textContent = card.text;
 }
 
-function renderCards() {
-  const select = $('card-category');
-  if (select.options.length === 0) {
-    CATEGORIES.forEach((c) => select.append(el('option', { text: `${c.emoji} ${c.name}`, attrs: { value: c.id } })));
-  }
-  $('custom-count').textContent = customCards.length ? `(${customCards.length})` : '';
-  $('custom-empty').hidden = customCards.length > 0;
-  $('custom-list').replaceChildren(
-    ...customCards.map((card) => {
-      const meta = [categoryLabel(card.category), `ab ${card.start} ${card.unit}`, `+${card.step}`];
-      if (card.proofSeconds) meta.push(`${card.proofSeconds} s Beweis`);
-      const del = el('button', { className: 'icon-btn', text: '🗑', attrs: { type: 'button', 'aria-label': 'Karte löschen' } });
-      del.addEventListener('click', () => deleteCustomCard(card.id));
-      return el('li', {}, [
-        el('div', { className: 'info' }, [
-          el('div', { className: 'text', text: card.text }),
-          el('div', { className: 'meta', text: meta.join(' · ') }),
-        ]),
-        del,
-      ]);
-    }),
-  );
-}
-
-function renderBid() {
+function renderCard() {
   const card = currentCard();
-  const bid = currentBid();
-  const waiting = bid === null;
+  fillCard('pc', card);
+  const meta = [`Startgebot: ${card.start} ${card.unit}`];
+  if (card.proofSeconds) meta.push(`Beweis in ${card.proofSeconds} s`);
+  $('pc-meta').textContent = meta.join(' · ');
 
-  $('bid-category').textContent = categoryLabel(card.category);
-  $('bid-card').textContent = card.text;
+  const remaining = playableCards().length;
+  $('deck-info').textContent = `${state.deck.length} von ${remaining} Karten übrig`;
   $('btn-scores').hidden = players.length === 0;
 
-  const value = String(waiting ? card.start : bid);
-  const valueEl = $('bid-value');
-  valueEl.textContent = value;
-  valueEl.classList.toggle('len-3', value.length === 3);
-  valueEl.classList.toggle('len-4', value.length >= 4);
-  $('bid-label').textContent = waiting ? 'Startgebot' : 'Höchstgebot';
-  $('bid-unit').textContent = card.unit;
-  $('bid-display').classList.toggle('is-waiting', waiting);
+  // „Fertig“ ergibt erst Sinn, wenn die Zeit läuft; Platz bleibt reserviert.
+  const idle = state.round.timer === 'idle';
+  $('btn-finish').classList.toggle('invisible', idle);
+  $('btn-finish').disabled = idle;
 
-  $('btn-undo').disabled = waiting;
-  $('btn-plus5').textContent = `+${5 * card.step}`;
-  // Nur unsichtbar machen statt entfernen: Der Platz bleibt reserviert, sonst
-  // rutscht der Plus-Button nach dem ersten Gebot unter dem Finger weg.
-  $('btn-skip').classList.toggle('invisible', !waiting);
-  $('btn-skip').disabled = !waiting;
-
-  renderTimer(bidTimer.running ? bidTimer.remaining() : state.round.pausedMs ?? bidMs());
+  renderRoundRing(roundTimer.running ? roundTimer.remaining() : state.round.remainingMs ?? roundMs());
 }
 
-function renderTimer(ms) {
-  const r = state.round;
-  if (!r || r.phase !== 'bid') return;
-  const waiting = r.bids.length === 0;
-  const paused = !waiting && !bidTimer.running;
-  const seconds = Math.ceil(ms / 1000);
+/** Setzt einen Ring: Anteil 0–1, Text in der Mitte, Zustandsklasse. */
+function setRing(prefix, fraction, value, sub, mode) {
+  const ring = $(`${prefix}-ring`);
+  ['is-idle', 'is-paused', 'is-urgent', 'is-done'].forEach((c) => ring.classList.toggle(c, c === `is-${mode}`));
+  $(`${prefix}-ring-progress`).style.strokeDashoffset = String(100 - Math.max(0, Math.min(1, fraction)) * 100);
+  $(`${prefix}-ring-value`).textContent = value;
+  $(`${prefix}-ring-sub`).textContent = sub;
+}
 
-  const timer = $('timer');
-  timer.classList.toggle('is-waiting', waiting);
-  timer.classList.toggle('is-paused', paused);
-  timer.classList.toggle('is-urgent', bidTimer.running && seconds <= 5);
-  $('timer-value').textContent = seconds;
-  $('timer-fill').style.transform = `scaleX(${Math.min(1, ms / bidMs())})`;
-  $('timer-caption').textContent = waiting
-    ? 'Startet mit dem ersten Gebot'
-    : paused
-      ? 'Pausiert – tippen zum Weitermachen'
-      : 'Tippen zum Pausieren';
+function renderRoundRing(ms) {
+  const r = state.round;
+  if (!r || r.phase !== 'card') return;
+  const seconds = Math.ceil(ms / 1000);
+  const ring = $('round-ring');
+  if (r.timer === 'idle') {
+    setRing('round', 1, 'Start', `${settings.timerSeconds} Sekunden`, 'idle');
+    ring.setAttribute('aria-label', 'Timer starten');
+  } else if (r.timer === 'paused') {
+    setRing('round', ms / roundMs(), seconds, 'Pause · tippen', 'paused');
+    ring.setAttribute('aria-label', 'Timer fortsetzen');
+  } else {
+    setRing('round', ms / roundMs(), seconds, 'Bietet!', seconds <= 5 ? 'urgent' : 'running');
+    ring.setAttribute('aria-label', 'Timer pausieren');
+  }
 }
 
 function renderProve() {
@@ -706,16 +660,14 @@ function renderProve() {
   // Wurde der gewählte Bieter inzwischen gelöscht? Dann neu wählen.
   if (r.bidderId && r.bidderId !== NO_SCORE && !findPlayer(r.bidderId)) r.bidderId = null;
 
-  $('prove-value').textContent = currentBid();
-  $('prove-unit').textContent = card.unit;
-  $('prove-card').textContent = card.text;
+  fillCard('pv', card);
 
   const needPick = players.length > 0 && r.bidderId === null;
   $('prove-bidder').hidden = !needPick;
   if (needPick) {
     $('bidder-buttons').replaceChildren(
       ...players.map((p) => {
-        const b = el('button', { className: 'btn btn-ghost', text: p.name, attrs: { type: 'button' } });
+        const b = el('button', { className: 'btn', text: p.name, attrs: { type: 'button' } });
         b.addEventListener('click', () => chooseBidder(p.id));
         return b;
       }),
@@ -725,35 +677,31 @@ function renderProve() {
   const who = $('prove-who');
   who.hidden = players.length === 0 || needPick;
   const bidder = findPlayer(r.bidderId);
-  who.textContent = bidder ? `🎤 ${bidder.name} muss liefern` : 'Ohne Wertung · ändern';
+  who.textContent = bidder ? `${bidder.name} ist dran` : 'Ohne Wertung · ändern';
 
   const hasProofTimer = Boolean(card.proofSeconds);
-  $('proof-timer').hidden = needPick || !hasProofTimer;
-  if (hasProofTimer) {
-    $('btn-proof-start').hidden = r.proofState !== 'idle';
-    renderProofTime(r.proofState === 'running' ? proofTimer.remaining() : card.proofSeconds * 1000);
-  }
+  $('proof-ring').hidden = needPick || !hasProofTimer;
+  if (hasProofTimer) renderProofRing(r.proofState === 'running' ? proofTimer.remaining() : card.proofSeconds * 1000);
   $('verdict').hidden = needPick;
 }
 
-function renderProofTime(ms) {
+function renderProofRing(ms) {
   const r = state.round;
-  const box = $('proof-time');
-  const done = r.proofState === 'done';
+  const total = currentCard().proofSeconds * 1000;
   const seconds = Math.ceil(ms / 1000);
-  box.textContent = done ? 'Zeit um!' : `${seconds} s`;
-  box.classList.toggle('is-done', done);
-  box.classList.toggle('is-urgent', r.proofState === 'running' && seconds <= 5);
+  if (r.proofState === 'idle') setRing('proof', 1, 'Start', `${total / 1000} s Beweis`, 'idle');
+  else if (r.proofState === 'done') setRing('proof', 0, 'Zeit um!', '', 'done');
+  else setRing('proof', ms / total, seconds, 'läuft', seconds <= 5 ? 'urgent' : 'running');
 }
 
 function renderResult() {
-  const card = currentCard();
   const r = state.round;
-  $('result-icon').textContent = r.success ? '🏆' : '💥';
-  const title = $('result-title');
-  title.textContent = r.success ? 'Geschafft!' : 'Nicht geschafft!';
-  title.className = `result-title ${r.success ? 'win' : 'lose'}`;
-  $('result-detail').textContent = `${currentBid()} ${card.unit}`;
+  const mark = $('result-mark');
+  mark.classList.toggle('win', r.success);
+  mark.classList.toggle('lose', !r.success);
+  // Haken bzw. Kreuz als SVG-Pfad
+  $('mark-path').setAttribute('d', r.success ? 'M38 62 L54 77 L83 45' : 'M44 44 L76 76 M76 44 L44 76');
+  $('result-title').textContent = r.success ? 'Geschafft!' : 'Nicht geschafft';
 
   const player = findPlayer(r.bidderId);
   const points = $('result-points');
@@ -770,9 +718,43 @@ function renderScoreboard(list, highlightId = null) {
       const rank = 1 + sorted.filter((o) => o.score > p.score).length;
       const classes = [rank === 1 ? 'leader' : '', p.id === highlightId ? 'highlight' : ''].join(' ').trim();
       return el('li', { className: classes }, [
-        el('span', { className: 'rank', text: rank === 1 ? '👑' : `${rank}.` }),
+        el('span', { className: 'rank', text: `${rank}.` }),
         el('span', { className: 'name', text: p.name }),
         el('span', { className: 'score', text: p.score }),
+      ]);
+    }),
+  );
+}
+
+function renderSettings() {
+  $('timer-setting').textContent = `${settings.timerSeconds} s`;
+  $('btn-timer-down').disabled = settings.timerSeconds <= TIMER_MIN;
+  $('btn-timer-up').disabled = settings.timerSeconds >= TIMER_MAX;
+  $('toggle-sound').checked = settings.sound;
+  $('toggle-vibration').checked = settings.vibration;
+  $('vibration-note').hidden = 'vibrate' in navigator;
+}
+
+function renderCards() {
+  const select = $('card-category');
+  if (select.options.length === 0) {
+    CATEGORIES.forEach((c) => select.append(el('option', { text: c.name, attrs: { value: c.id } })));
+  }
+  $('custom-count').textContent = customCards.length ? String(customCards.length) : '';
+  $('custom-empty').hidden = customCards.length > 0;
+  $('custom-list').replaceChildren(
+    ...customCards.map((card) => {
+      const meta = [category(card.category).name, `ab ${card.start} ${card.unit}`];
+      if (card.proofSeconds) meta.push(`${card.proofSeconds} s Beweis`);
+      const del = el('button', { className: 'icon-btn', attrs: { type: 'button', 'aria-label': 'Karte löschen' } });
+      del.innerHTML = '<svg class="icon"><use href="#i-trash"/></svg>'; // fester Inhalt, keine Nutzerdaten
+      del.addEventListener('click', () => deleteCustomCard(card.id));
+      return el('li', {}, [
+        el('div', { className: 'info' }, [
+          el('div', { className: 'text', text: card.text }),
+          el('div', { className: 'meta' }, [categoryDot(card.category), el('span', { text: meta.join(' · ') })]),
+        ]),
+        del,
       ]);
     }),
   );
@@ -785,15 +767,13 @@ function bindEvents() {
 
   $('btn-start').addEventListener('click', startGame);
   $('btn-home').addEventListener('click', goHome);
-  $('btn-plus').addEventListener('click', () => raise(1));
-  $('btn-plus5').addEventListener('click', () => raise(5));
-  $('btn-undo').addEventListener('click', undo);
+  $('round-ring').addEventListener('click', onRingTap);
+  $('btn-finish').addEventListener('click', finishEarly);
   $('btn-skip').addEventListener('click', skipCard);
-  $('timer').addEventListener('click', togglePause);
-  $('bid-display').addEventListener('click', openBidDialog);
+  $('btn-skip-prove').addEventListener('click', skipCard);
   $('btn-no-score').addEventListener('click', () => chooseBidder(NO_SCORE));
   $('prove-who').addEventListener('click', changeBidder);
-  $('btn-proof-start').addEventListener('click', startProof);
+  $('proof-ring').addEventListener('click', onProofRingTap);
   $('btn-success').addEventListener('click', () => finishRound(true));
   $('btn-fail').addEventListener('click', () => finishRound(false));
   $('btn-next').addEventListener('click', nextCard);
@@ -814,20 +794,12 @@ function bindEvents() {
   $('toggle-vibration').addEventListener('change', (e) => setToggle('vibration', e.target.checked));
   $('btn-test-sound').addEventListener('click', testFeedback);
   $('form-card').addEventListener('submit', addCustomCard);
+
   $('btn-confirm-ok').addEventListener('click', () => {
     $('dlg-confirm').close();
     onConfirm?.();
     onConfirm = null;
   });
-
-  $('form-bid').addEventListener('submit', submitBidDialog);
-  $('dlg-bid').querySelector('[data-close]').addEventListener('click', () => closeBidDialog(false));
-  // Esc-Taste / Zurück-Geste schließt den Dialog ebenfalls.
-  $('dlg-bid').addEventListener('cancel', (e) => {
-    e.preventDefault();
-    closeBidDialog(false);
-  });
-  // Alle anderen Dialoge: [data-close]-Buttons schließen einfach.
   ['dlg-scores', 'dlg-confirm'].forEach((id) => {
     $(id).querySelector('[data-close]').addEventListener('click', () => $(id).close());
   });

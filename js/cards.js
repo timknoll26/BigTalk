@@ -3,14 +3,15 @@
 //   text        die Challenge-Frage
 //   category    "geschick" | "koerper" | "wissen"
 //   unit        Einheit des Gebots (z. B. "Liegestütze")
-//   start       erstes Gebot
-//   step        Mindestschritt beim Überbieten
+//   start       Startgebot – als Orientierung, ab wo geboten wird
+//   step        Mindestschritt beim Überbieten (derzeit nur Info, siehe IDEEN.md „Online-Version“)
 //   proofSeconds  optional: Zeitlimit für den Beweis in Sekunden
 
+// `color` ist der Name einer CSS-Variable aus style.css (--gold, --coral, --sky).
 export const CATEGORIES = [
-  { id: 'geschick', name: 'Geschick', emoji: '🎯' },
-  { id: 'koerper', name: 'Körper', emoji: '💪' },
-  { id: 'wissen', name: 'Wissen', emoji: '🧠' },
+  { id: 'geschick', name: 'Geschick', color: 'gold' },
+  { id: 'koerper', name: 'Körper', color: 'coral' },
+  { id: 'wissen', name: 'Wissen', color: 'sky' },
 ];
 
 export const DEFAULT_CARDS = [

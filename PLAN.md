@@ -1,13 +1,16 @@
 # Big Talk – Plan
 
-Partyspiel für **ein** Handy: Challenge-Karte anzeigen, Spieler überbieten sich durch Zurufen,
-wer das Handy hält, tippt jedes Gebot ein. Nach 15 s ohne neues Gebot muss der Höchstbieter liefern.
+Partyspiel für **ein** Handy: Challenge-Karte anzeigen, alle drücken gemeinsam auf Start und überbieten
+sich 15 Sekunden lang durch Zurufen (ohne Eingaben). Danach muss der Höchstbieter liefern.
+
+> Version 2 (Okt. 2026): Das ursprüngliche Eintippen jedes Gebots mit Timer-Reset wurde ersetzt.
+> Die alte Mechanik ist als Idee für eine Online-Version in IDEEN.md festgehalten.
 
 ## Dateistruktur
 
 ```
 index.html              Alle Bildschirme als <section class="screen"> – immer nur einer sichtbar
-style.css               Gesamtes Design (Mobile-first, dunkles Party-Theme)
+style.css               Gesamtes Design (Mobile-first, „Spieltisch“: grüner Filz, Papierkarten)
 manifest.webmanifest    PWA-Manifest (Name, Farben, Icons → Homescreen)
 sw.js                   Service Worker (Offline-Cache)
 icons/                  App-Icons (SVG + PNG 192/512 + Apple-Touch-Icon 180)
@@ -32,25 +35,26 @@ js/
 | `bigtalk.customCards`| eigene Karten, gleiche Struktur wie Startkarten                   |
 | `bigtalk.game`       | `{ deck: [ids], phase, round }` – laufende Runde                 |
 
-`round = { cardId, bids: [Zahlen], bidderId, result }`
+`round = { cardId, phase, timer, endsAt, remainingMs, proofState, bidderId, success, delta }`
 
-Laufende Timer werden **nicht** als „läuft“ gespeichert: Nach einem Neuladen ist die Runde
-pausiert und wird mit einem Tipp fortgesetzt (sonst könnte der Timer abgelaufen sein,
-während niemand hinschaut).
+Nach einem Neuladen läuft der Timer nicht ungefragt weiter: Die Restzeit wird zur Pause.
+War die Zeit schon abgelaufen, geht es direkt zum Beweis.
 
 ## Ablauf (Phasen)
 
 ```
-start ──► bid ──(Timer 0)──► prove ──(Geschafft/Nicht)──► result ──► bid (nächste Karte)
+start ──► card ──(Start, 15 s)──► prove ──(Geschafft/Nicht)──► result ──► card (nächste Karte)
+             └──── Überspringen (jederzeit, auch im Beweis) ────► card
 ```
 
-- **start**: Logo, „Los geht's“, Spieler, Kategorien, Kurzregeln, Einstellungen, eigene Karten.
-- **bid**: Karte + Höchstgebot + Timer. Erstes „+“ setzt den Startwert, jedes weitere +Mindestschritt.
-  „+5“ für große Sprünge, Tippen auf die Zahl für direkte Eingabe, Rückgängig nimmt das letzte
-  Gebot zurück. Vor dem ersten Gebot: „Karte überspringen“.
-- **prove**: Vollbild „Beweis es!“ + finales Gebot. Mit Spielern: Höchstbieter wählen.
+- **start**: Logo, „Los geht's“, Kategorien, Spieler, Kurzregeln, Einstellungen, eigene Karten.
+- **card**: Karte + Ring-Timer. Ring antippen = Start / Pause / Weiter. „Fertig geboten“ beendet früher,
+  „Überspringen“ wirft die Karte weg.
+- **prove**: Stempel „Beweis es!“ + Karte. Mit Spielern: Höchstbieter wählen.
   Optionaler Beweis-Timer mit Start-Button. Buttons „Geschafft“ / „Nicht geschafft“.
 - **result**: Ergebnis, Punkteänderung, Punktestand, „Nächste Karte“.
+
+Version 2 (nach erstem Feedback): Ablauf ohne Eingaben, Überspringen überall, neues Design → ENTSCHEIDUNGEN Nr. 24–28.
 
 ## Etappen
 

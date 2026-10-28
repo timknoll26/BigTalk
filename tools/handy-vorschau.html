@@ -12,5 +12,12 @@
 </head>
 <body>
   <iframe id="phone" src="../index.html"></iframe>
+  <script>
+    // Andere Größe testen: handy-vorschau.html?w=375&h=667 (z. B. iPhone SE)
+    const p = new URLSearchParams(location.search);
+    const f = document.getElementById('phone');
+    if (p.get('w')) f.style.width = p.get('w') + 'px';
+    if (p.get('h')) f.style.height = p.get('h') + 'px';
+  </script>
 </body>
 </html>

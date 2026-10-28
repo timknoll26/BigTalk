@@ -102,3 +102,30 @@ Vibration) und einer für eigene Karten (anlegen, löschen).
   fürs Aussehen (`.cat-toggle[aria-pressed="true"]`). So stimmen Optik und Zugänglichkeit immer überein.
 - **Checkbox als Kippschalter:** `.switch` ist eine normale `<input type="checkbox">`, nur per CSS umgestaltet
   (`appearance: none` + `::after` für den Knopf).
+
+---
+
+## Etappe 5 – PWA, Offline, Wake Lock, Feinschliff
+
+**Was:** Big Talk lässt sich auf den Homescreen legen, läuft nach dem ersten Öffnen offline, und der
+Bildschirm bleibt während des Spiels an.
+
+**Konzepte:**
+- **PWA (Progressive Web App):** Eine Webseite, die sich wie eine App verhält. Dafür braucht es
+  1. ein **Manifest** (`manifest.webmanifest`): Name, Farben, Icons, `"display": "standalone"` (ohne Browserleiste);
+  2. einen **Service Worker** (`sw.js`) für den Offline-Betrieb;
+  3. HTTPS (GitHub Pages hat das automatisch; `localhost` gilt zum Testen auch als sicher).
+- **Service Worker:** Ein Skript, das zwischen Seite und Internet sitzt. Er hat drei Phasen:
+  `install` (Dateien in den Cache laden), `activate` (alte Caches löschen) und `fetch` (jede Anfrage
+  abfangen und z. B. aus dem Cache beantworten). In Chrome: **F12 → Application → Service Workers / Cache Storage**.
+- **Cache API:** `caches.open('bigtalk-v1')` ist ein Speicher für komplette Antworten (Datei samt Kopfzeilen).
+  Wenn du etwas Größeres änderst, erhöhe `CACHE_VERSION` in `sw.js`. Dann bekommen alle eine frische Kopie.
+- **Promises / async-await:** Viele Browser-Funktionen liefern das Ergebnis „später“ (z. B. `fetch`,
+  `caches.open`). `await` wartet darauf, `.then(...)` macht dasselbe in anderer Schreibweise.
+- **Screen Wake Lock API:** `navigator.wakeLock.request('screen')` hält den Bildschirm an. Der Browser löst die
+  Sperre, wenn du die App verlässt. Darum fordert `wakelock.js` sie bei `visibilitychange` neu an.
+- **Media Queries:** `@media (max-height: 700px) { … }` gilt nur auf niedrigen Bildschirmen. So passt alles auch
+  auf ein iPhone SE.
+- **`env(safe-area-inset-…)`:** Abstand zur iPhone-Notch und zur Home-Leiste, damit nichts verdeckt wird.
+
+**Werkzeug:** `tools/handy-vorschau.html?w=375&h=667` simuliert andere Bildschirmgrößen.

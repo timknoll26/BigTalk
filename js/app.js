@@ -11,6 +11,7 @@ import { sounds, unlockAudio, setSoundEnabled } from './sound.js';
 import { vibrate, setVibrationEnabled } from './feedback.js';
 import { load, save } from './storage.js';
 import { scoreDelta, formatDelta } from './scoring.js';
+import { keepAwake } from './wakelock.js';
 
 const MAX_PLAYERS = 12;
 const NO_SCORE = 'none'; // bidderId, wenn bewusst ohne Wertung gespielt wird
@@ -571,6 +572,7 @@ function showScreen(id) {
 
 function render() {
   saveGame(); // jede Änderung landet sofort im Speicher
+  keepAwake(state.screen === 'game'); // Bildschirm nur während des Spiels wach halten
   if (state.screen === 'settings' || state.screen === 'cards') {
     state.screen === 'settings' ? renderSettings() : renderCards();
     showScreen(`screen-${state.screen}`);
@@ -836,3 +838,10 @@ setVibrationEnabled(settings.vibration);
 restoreGame();
 bindEvents();
 render();
+
+// Service Worker anmelden → Offline-Betrieb und „Zum Startbildschirm hinzufügen“.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {
+    // Ohne Service Worker läuft das Spiel normal, nur nicht offline.
+  });
+}

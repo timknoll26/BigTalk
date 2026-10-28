@@ -106,3 +106,32 @@ Kurzprotokoll: **was** entschieden wurde, **warum**, und welche Alternative verw
 **19. Startkarten sind nicht löschbar, nur eigene**
 - Warum: Laut Anforderung „eigene Karten hinzufügen und löschen“. Startkarten lassen sich über die Kategorie abwählen.
   So kann man das Spiel nicht versehentlich „leer löschen“.
+
+## Etappe 5 – PWA, Wake Lock, Feinschliff
+
+**20. Service Worker mit „stale-while-revalidate“**
+- Gewählt: Sofort aus dem Cache antworten, im Hintergrund aktualisieren. Alle App-Dateien werden bei der
+  Installation vorab geladen.
+- Warum: Startet sofort und offline. Änderungen erscheinen beim nächsten Öffnen von selbst, auch wenn man
+  vergisst, die Cache-Version zu erhöhen.
+- Verworfen: (a) Reines „cache-first“ – Updates kommen *nie*, solange die Versionsnummer nicht erhöht wird.
+  (b) „network-first“ – bei schlechtem Party-WLAN wartet man beim Start auf das Netz.
+- Nachteil: Nach einer Änderung zeigt der *erste* Aufruf noch die alte Version.
+- Fehler beim Testen gefunden: Die erste Version beantwortete jede Navigation mit der Startseite (auch die
+  Vorschau-Seite). Jetzt: Cache → Netz → nur offline die Startseite.
+
+**21. Wake Lock API, Fallback: stummes Canvas-Video**
+- Gewählt: `navigator.wakeLock.request('screen')`. Wo das fehlt (ältere iPhones vor iOS 16.4), läuft ein
+  unsichtbares, stummes Video aus einem 2×2-Pixel-Canvas, wie bei NoSleep.js, nur ohne Videodatei.
+- Warum: Die Anforderung „keine Medien-Dateien“ gilt sinngemäß auch hier. Der Canvas-Stream braucht keine Datei.
+- Verworfen: NoSleep.js einbinden (externe Bibliothek, enthält eingebettete MP4) bzw. nur ein Hinweistext.
+- Unsicher: Ob der Canvas-Trick auf alten iPhones wirkt, ist am Desktop nicht prüfbar → TESTEN.md.
+- Die Sperre gilt nur im Spiel, nicht auf Start, Einstellungen oder Karten. So ist der Akku geschont.
+
+**22. PNG-Icons einmalig aus einer SVG erzeugt**
+- Warum: Android verlangt für die Installation PNG-Icons (192/512, dazu „maskable“ mit Sicherheitsrand),
+  iPhones ein 180-px-Apple-Icon. Erzeugt wurden sie aus `icons/icon.svg` per Browser-Canvas.
+- Verworfen: Nur SVG-Icon – wird nicht überall als App-Icon akzeptiert.
+
+**23. Kompaktere Maße für niedrige Bildschirme (`max-height: 700px`)**
+- Warum: Auf dem iPhone SE (667 px) darf während des Bietens nichts scrollen. Getestet mit allen 31 Karten.

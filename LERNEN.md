@@ -53,7 +53,7 @@ siehst du die Seite in Handygröße.
   `endsAt - Date.now()` aus. `setInterval(fn, 100)` ruft `fn` alle 100 ms auf, `clearInterval` beendet das.
 - **Mischen (Fisher-Yates):** `deck.js` mischt die Karten-IDs einmal. Gezogen wird von vorne. Erst wenn die Liste
   leer ist, wird neu gemischt. So kommt keine Karte doppelt, bevor alle dran waren.
-- **Web Audio API:** `sound.js` erzeugt Töne mit einem *Oszillator* (Tonerzeuger mit Frequenz in Hertz) und
+- **Web Audio API** *(seit Version 2.1 entfernt, siehe ENTSCHEIDUNGEN Nr. 30)*: `sound.js` erzeugte Töne mit einem *Oszillator* (Tonerzeuger mit Frequenz in Hertz) und
   einem *Gain* (Lautstärkeregler). Browser erlauben Ton erst nach dem ersten Tippen, daher `unlockAudio()`.
 - **`<dialog>`:** Eingebautes HTML-Element für Pop-ups. `showModal()` öffnet es und sperrt den Rest der Seite.
 - **Layout ohne Springen:** „Karte überspringen“ wird nach dem ersten Gebot nur *unsichtbar*

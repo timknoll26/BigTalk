@@ -21,7 +21,6 @@ js/
   scoring.js    Punkteregeln (an einer Stelle änderbar)
   storage.js    localStorage lesen/schreiben (fehlertolerant)
   timer.js      Countdown auf Basis von Zeitstempeln (überlebt Tab-Wechsel)
-  sound.js      Töne über die Web Audio API (keine Dateien)
   feedback.js   Vibration
   wakelock.js   Bildschirm wach halten (Wake Lock API + Fallback)
 ```
@@ -30,7 +29,7 @@ js/
 
 | Schlüssel            | Inhalt                                                           |
 |----------------------|------------------------------------------------------------------|
-| `bigtalk.settings`   | `{ timerSeconds, sound, vibration, categories: [...] }`          |
+| `bigtalk.settings`   | `{ timerSeconds, vibration, categories: [...] }`          |
 | `bigtalk.players`    | `[{ id, name, score }]`                                          |
 | `bigtalk.customCards`| eigene Karten, gleiche Struktur wie Startkarten                   |
 | `bigtalk.game`       | `{ deck: [ids], phase, round }` – laufende Runde                 |

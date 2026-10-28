@@ -7,7 +7,7 @@
 //
 // Bei einem Release CACHE_VERSION erhöhen: Dann wird der alte Cache komplett ersetzt.
 
-const CACHE_VERSION = 'bigtalk-v2';
+const CACHE_VERSION = 'bigtalk-v3';
 
 const APP_FILES = [
   './',
@@ -19,7 +19,6 @@ const APP_FILES = [
   'js/deck.js',
   'js/feedback.js',
   'js/scoring.js',
-  'js/sound.js',
   'js/storage.js',
   'js/timer.js',
   'js/wakelock.js',

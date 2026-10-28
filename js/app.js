@@ -10,7 +10,6 @@
 import { DEFAULT_CARDS, CATEGORIES } from './cards.js';
 import { drawCard } from './deck.js';
 import { Countdown } from './timer.js';
-import { sounds, unlockAudio, setSoundEnabled } from './sound.js';
 import { vibrate, setVibrationEnabled } from './feedback.js';
 import { load, save } from './storage.js';
 import { scoreDelta, formatDelta } from './scoring.js';
@@ -26,7 +25,6 @@ const TOSS_MS = 320; // Dauer der Wegflieg-Animation beim Überspringen (siehe .
 // ---------- Zustand ----------
 const DEFAULT_SETTINGS = {
   timerSeconds: 15,
-  sound: true,
   vibration: true,
   categories: CATEGORIES.map((c) => c.id), // eingeschaltete Kategorien
 };
@@ -127,7 +125,6 @@ function savePlayers() {
 
 function saveSettings() {
   save('settings', settings);
-  setSoundEnabled(settings.sound);
   setVibrationEnabled(settings.vibration);
 }
 
@@ -169,10 +166,9 @@ let lastWholeSecond = null;
 const roundTimer = new Countdown({
   onTick(ms) {
     renderRoundRing(ms);
-    // In den letzten 5 Sekunden jede volle Sekunde ticken.
+    // In den letzten 5 Sekunden jede volle Sekunde: kurz vibrieren, Zahl pulsiert.
     const s = Math.ceil(ms / 1000);
     if (s !== lastWholeSecond && s > 0 && s <= 5) {
-      sounds.tick();
       vibrate(40);
       replayAnimation($('round-ring-value'), 'beat');
       if (s <= 3) replayAnimation($('play-card'), 'nervous');
@@ -186,7 +182,6 @@ const proofTimer = new Countdown({
   onTick: renderProofRing,
   onEnd() {
     state.round.proofState = 'done';
-    sounds.timeUp();
     vibrate([300, 100, 300]);
     render();
   },
@@ -247,8 +242,6 @@ function nextCard() {
 function onRingTap() {
   const r = state.round;
   if (r.timer === 'idle') {
-    unlockAudio();
-    sounds.go();
     vibrate(60);
     runRoundTimer(roundMs());
   } else if (r.timer === 'running') {
@@ -256,7 +249,6 @@ function onRingTap() {
     r.endsAt = null;
     r.timer = 'paused';
     roundTimer.stop();
-    sounds.pause();
   } else {
     runRoundTimer(r.remainingMs ?? roundMs());
   }
@@ -276,7 +268,6 @@ function skipCard() {
   if (skipping) return;
   roundTimer.stop();
   proofTimer.stop();
-  sounds.skip();
   if (state.round?.phase !== 'card') {
     nextCard();
     return;
@@ -312,7 +303,7 @@ function goHome() {
   render();
 }
 
-/** Setzt eine Runde in die Beweis-Phase (ohne Ton/Animation – das macht onTimeUp). */
+/** Setzt eine Runde in die Beweis-Phase (ohne Vibration/Animation – das macht onTimeUp). */
 function enterProve(r) {
   r.phase = 'prove';
   r.timer = 'idle';
@@ -324,7 +315,6 @@ function enterProve(r) {
 
 function onTimeUp() {
   enterProve(state.round);
-  sounds.timeUp();
   vibrate([500, 150, 500, 150, 800]);
   render();
   // Stempel und Blitz nur beim echten Ablauf, nicht beim Zurückkehren.
@@ -348,7 +338,6 @@ function onProofRingTap() {
   const r = state.round;
   if (r.proofState !== 'idle') return;
   r.proofState = 'running';
-  sounds.go();
   vibrate(100);
   proofTimer.start(currentCard().proofSeconds * 1000);
   render();
@@ -367,7 +356,6 @@ function finishRound(success) {
     player.score += r.delta;
     savePlayers();
   }
-  success ? sounds.success() : sounds.fail();
   vibrate(success ? [80, 60, 80] : 400);
   render();
   replayAnimation($('result-mark'), 'draw');
@@ -469,9 +457,7 @@ function setToggle(key, value) {
   render();
 }
 
-function testFeedback() {
-  unlockAudio();
-  sounds.timeUp();
+function testVibration() {
   vibrate([200, 100, 200]);
 }
 
@@ -730,7 +716,6 @@ function renderSettings() {
   $('timer-setting').textContent = `${settings.timerSeconds} s`;
   $('btn-timer-down').disabled = settings.timerSeconds <= TIMER_MIN;
   $('btn-timer-up').disabled = settings.timerSeconds >= TIMER_MAX;
-  $('toggle-sound').checked = settings.sound;
   $('toggle-vibration').checked = settings.vibration;
   $('vibration-note').hidden = 'vibrate' in navigator;
 }
@@ -762,9 +747,6 @@ function renderCards() {
 
 // ---------- Events verbinden ----------
 function bindEvents() {
-  // Audio darf erst nach einer Nutzeraktion starten.
-  document.addEventListener('pointerdown', unlockAudio);
-
   $('btn-start').addEventListener('click', startGame);
   $('btn-home').addEventListener('click', goHome);
   $('round-ring').addEventListener('click', onRingTap);
@@ -790,9 +772,8 @@ function bindEvents() {
   document.querySelectorAll('[data-home]').forEach((b) => b.addEventListener('click', goHome));
   $('btn-timer-down').addEventListener('click', () => changeTimer(-1));
   $('btn-timer-up').addEventListener('click', () => changeTimer(1));
-  $('toggle-sound').addEventListener('change', (e) => setToggle('sound', e.target.checked));
   $('toggle-vibration').addEventListener('change', (e) => setToggle('vibration', e.target.checked));
-  $('btn-test-sound').addEventListener('click', testFeedback);
+  $('btn-test-vibration').addEventListener('click', testVibration);
   $('form-card').addEventListener('submit', addCustomCard);
 
   $('btn-confirm-ok').addEventListener('click', () => {
@@ -805,7 +786,6 @@ function bindEvents() {
   });
 }
 
-setSoundEnabled(settings.sound);
 setVibrationEnabled(settings.vibration);
 restoreGame();
 bindEvents();

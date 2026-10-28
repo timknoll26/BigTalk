@@ -175,3 +175,11 @@ Kurzprotokoll: **was** entschieden wurde, **warum**, und welche Alternative verw
 
 **29. Neuladen: Restzeit als Pause, abgelaufene Zeit → direkt Beweis**
 - Ersetzt Nr. 4: Da der Timer nicht mehr zurückgesetzt wird, wird die echte Restzeit gemerkt (`endsAt`).
+
+**30. Keine Töne mehr**
+- Gewählt: Alle Töne entfernt (`sound.js`, Ton-Schalter). Signal geben jetzt nur noch Animation (roter Ring,
+  zitternde Karte, Stempel, Blitz) und Vibration.
+- Warum (Feedback): Die Töne waren „extrem nervig“. Auf einer Party ist ohnehin genug Lärm, und alle schauen
+  auf das Handy in der Mitte.
+- Verworfen: Ton standardmäßig aus, aber abschaltbar lassen – mehr Code und Einstellungen für etwas, das
+  niemand möchte. Falls Töne doch fehlen: Die alte Datei steckt in der Git-Historie (Commit 5f47607).

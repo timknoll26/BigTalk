@@ -25,6 +25,9 @@
       <button id="btn-start" class="btn btn-primary btn-xl" type="button">Los geht's</button>
       <button id="btn-scores-start" class="btn btn-ghost" type="button">🏆 Punktestand</button>
 
+      <!-- Kategorien: Tippen schaltet an/aus (aria-pressed) -->
+      <div id="category-toggles" class="category-toggles" role="group" aria-label="Kategorien"></div>
+
       <details id="panel-players" class="panel">
         <summary>Spieler <span id="players-count" class="count"></span></summary>
         <p class="hint">Optional – nur für den Punktestand. Ohne Spieler wird ohne Punkte gespielt.</p>
@@ -46,6 +49,86 @@
           <li>Der Höchstbieter muss <b>sofort</b> beweisen, dass er es schafft. Die Gruppe entscheidet.</li>
         </ol>
       </details>
+
+      <div class="start-links">
+        <button id="btn-open-cards" class="btn btn-ghost" type="button">🃏 Eigene Karten</button>
+        <button id="btn-open-settings" class="btn btn-ghost" type="button">⚙️ Einstellungen</button>
+      </div>
+    </section>
+
+    <!-- ============ EINSTELLUNGEN ============ -->
+    <section id="screen-settings" class="screen">
+      <header class="topbar">
+        <button class="icon-btn" type="button" data-home aria-label="Zurück">←</button>
+        <h2 class="topbar-title">Einstellungen</h2>
+      </header>
+
+      <div class="setting">
+        <span class="setting-label">Timer pro Gebot</span>
+        <div class="stepper">
+          <button id="btn-timer-down" class="btn btn-side" type="button" aria-label="Timer kürzer">−</button>
+          <output id="timer-setting" class="stepper-value" aria-live="polite"></output>
+          <button id="btn-timer-up" class="btn btn-side" type="button" aria-label="Timer länger">+</button>
+        </div>
+      </div>
+
+      <label class="setting setting-row">
+        <span class="setting-label">Ton</span>
+        <input id="toggle-sound" class="switch" type="checkbox">
+      </label>
+
+      <label class="setting setting-row">
+        <span class="setting-label">Vibration <small id="vibration-note" class="hint" hidden>(von diesem Gerät nicht unterstützt)</small></span>
+        <input id="toggle-vibration" class="switch" type="checkbox">
+      </label>
+
+      <button id="btn-test-sound" class="btn btn-ghost" type="button">🔊 Ton &amp; Vibration testen</button>
+      <button id="btn-reset-settings" class="btn btn-ghost btn-danger" type="button">Spiel zurücksetzen</button>
+    </section>
+
+    <!-- ============ EIGENE KARTEN ============ -->
+    <section id="screen-cards" class="screen">
+      <header class="topbar">
+        <button class="icon-btn" type="button" data-home aria-label="Zurück">←</button>
+        <h2 class="topbar-title">Eigene Karten</h2>
+      </header>
+
+      <form id="form-card" class="card-form" novalidate>
+        <label class="field">
+          <span>Challenge</span>
+          <textarea id="card-text" rows="3" maxlength="140" placeholder="Wie viele … schaffst du?"></textarea>
+        </label>
+        <div class="field-row">
+          <label class="field">
+            <span>Kategorie</span>
+            <select id="card-category"></select>
+          </label>
+          <label class="field">
+            <span>Einheit</span>
+            <input id="card-unit" type="text" maxlength="20" placeholder="z. B. Sekunden">
+          </label>
+        </div>
+        <div class="field-row field-row-3">
+          <label class="field">
+            <span>Startwert</span>
+            <input id="card-start" type="number" inputmode="numeric" min="1" value="1">
+          </label>
+          <label class="field">
+            <span>Schritt</span>
+            <input id="card-step" type="number" inputmode="numeric" min="1" value="1">
+          </label>
+          <label class="field">
+            <span>Beweiszeit (s)</span>
+            <input id="card-proof" type="number" inputmode="numeric" min="5" placeholder="keine">
+          </label>
+        </div>
+        <p id="card-error" class="form-error" hidden></p>
+        <button class="btn btn-primary" type="submit">Karte hinzufügen</button>
+      </form>
+
+      <h3 class="section-title">Deine Karten <span id="custom-count" class="count"></span></h3>
+      <ul id="custom-list" class="custom-list"></ul>
+      <p id="custom-empty" class="hint">Noch keine eigenen Karten.</p>
     </section>
 
     <!-- ============ BIETEN ============ -->

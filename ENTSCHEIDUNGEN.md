@@ -82,3 +82,27 @@ Kurzprotokoll: **was** entschieden wurde, **warum**, und welche Alternative verw
 
 **14. Eigene Bestätigungs-Dialoge statt `window.confirm()`**
 - Warum: Passen zum Design, große Buttons. `confirm()` sieht auf jedem Handy anders aus und ist winzig.
+
+## Etappe 4 – Kategorien, eigene Karten, Einstellungen
+
+**15. Kategorien als große Schalter direkt auf dem Startbildschirm**
+- Gewählt: Drei Kacheln (🎯 💪 🧠) unter „Los geht's“, mit Kartenanzahl.
+- Warum: Eine Kernentscheidung vor jedem Spiel – soll sichtbar sein, nicht in den Einstellungen versteckt.
+- Verworfen: Checkboxen im Einstellungs-Bildschirm – ein Klick mehr, wird übersehen.
+
+**16. Die letzte Kategorie lässt sich nicht ausschalten**
+- Warum: Verhindert den Zustand „leeres Deck“ schon an der Quelle. Ein Hinweis erklärt, warum.
+- Verworfen: Ausschalten erlauben und erst beim Start meckern – man landet in einer Sackgasse.
+- Der Randfall bleibt trotzdem abgefangen: `drawCard` liefert `null`, dann erscheint ein Hinweis.
+
+**17. Einstellungen und eigene Karten als eigene Bildschirme statt Dialoge**
+- Warum: Das Kartenformular ist lang (6 Felder) und braucht die Handytastatur. In einem Dialog wird das eng.
+- Verworfen: Alles auf dem Startbildschirm – der wäre überladen.
+
+**18. Timer-Länge in 5-Sekunden-Schritten (5–60 s) über −/+**
+- Warum: Mit einer Hand bedienbar, keine Tastatur nötig.
+- Verworfen: Schieberegler – auf kleinen Bildschirmen fummelig und ungenau.
+
+**19. Startkarten sind nicht löschbar, nur eigene**
+- Warum: Laut Anforderung „eigene Karten hinzufügen und löschen“. Startkarten lassen sich über die Kategorie abwählen.
+  So kann man das Spiel nicht versehentlich „leer löschen“.

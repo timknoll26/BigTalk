@@ -7,18 +7,35 @@
 import { DEFAULT_CARDS, CATEGORIES } from './cards.js';
 import { drawCard } from './deck.js';
 import { Countdown } from './timer.js';
-import { sounds, unlockAudio } from './sound.js';
-import { vibrate } from './feedback.js';
+import { sounds, unlockAudio, setSoundEnabled } from './sound.js';
+import { vibrate, setVibrationEnabled } from './feedback.js';
 import { load, save } from './storage.js';
 import { scoreDelta, formatDelta } from './scoring.js';
 
-const BID_SECONDS = 15;
 const MAX_PLAYERS = 12;
 const NO_SCORE = 'none'; // bidderId, wenn bewusst ohne Wertung gespielt wird
+const TIMER_MIN = 5;
+const TIMER_MAX = 60;
+const TIMER_STEP = 5;
 
 // ---------- Zustand ----------
+const DEFAULT_SETTINGS = {
+  timerSeconds: 15,
+  sound: true,
+  vibration: true,
+  categories: CATEGORIES.map((c) => c.id), // eingeschaltete Kategorien
+};
+
+// Gespeicherte Einstellungen über die Standardwerte legen – so bekommen auch
+// alte Speicherstände neue Einstellungen mit Standardwert.
+const settings = { ...DEFAULT_SETTINGS, ...load('settings', {}) };
+settings.categories = settings.categories.filter((id) => CATEGORIES.some((c) => c.id === id));
+if (settings.categories.length === 0) settings.categories = DEFAULT_SETTINGS.categories;
+
+let customCards = load('customCards', []);
+
 const state = {
-  screen: 'start', // 'start' | 'game'
+  screen: 'start', // 'start' | 'game' | 'settings' | 'cards'
   deck: [], // noch nicht gespielte Karten-IDs
   lastCardId: null,
   // Die laufende Runde (oder null):
@@ -33,8 +50,15 @@ let players = load('players', []); // [{ id, name, score }]
 // ---------- Hilfsfunktionen ----------
 const $ = (id) => document.getElementById(id);
 
+const bidMs = () => settings.timerSeconds * 1000;
+
 function allCards() {
-  return DEFAULT_CARDS;
+  return [...DEFAULT_CARDS, ...customCards];
+}
+
+/** Karten der eingeschalteten Kategorien – nur daraus wird gezogen. */
+function playableCards() {
+  return allCards().filter((c) => settings.categories.includes(c.category));
 }
 
 function findCard(id) {
@@ -105,6 +129,12 @@ function savePlayers() {
   save('players', players);
 }
 
+function saveSettings() {
+  save('settings', settings);
+  setSoundEnabled(settings.sound);
+  setVibrationEnabled(settings.vibration);
+}
+
 /** Stellt nach dem Neuladen den letzten Stand her – laufende Timer werden zu Pausen. */
 function restoreGame() {
   const saved = load('game', null);
@@ -122,7 +152,7 @@ function restoreGame() {
     state.screen = 'start';
     return;
   }
-  if (r.phase === 'bid' && r.bids.length > 0) r.pausedMs = BID_SECONDS * 1000;
+  if (r.phase === 'bid' && r.bids.length > 0) r.pausedMs = bidMs();
   if (r.phase === 'prove' && r.proofState === 'running') r.proofState = 'idle';
 }
 
@@ -153,7 +183,7 @@ const proofTimer = new Countdown({
   },
 });
 
-function startBidTimer(ms = BID_SECONDS * 1000) {
+function startBidTimer(ms = bidMs()) {
   state.round.pausedMs = null;
   lastWholeSecond = null;
   bidTimer.start(ms);
@@ -172,11 +202,11 @@ function startGame() {
 function nextCard() {
   bidTimer.stop();
   proofTimer.stop();
-  const result = drawCard(state.deck, allCards(), state.lastCardId);
+  const result = drawCard(state.deck, playableCards(), state.lastCardId);
   if (!result.card) {
     state.round = null;
     state.screen = 'start';
-    toast('Keine Karten verfügbar.');
+    toast('Keine Karten in den gewählten Kategorien.');
     render();
     return;
   }
@@ -234,7 +264,7 @@ function togglePause() {
     r.pausedMs = bidTimer.remaining();
     bidTimer.stop();
   } else {
-    startBidTimer(r.pausedMs ?? BID_SECONDS * 1000);
+    startBidTimer(r.pausedMs ?? bidMs());
   }
   render();
 }
@@ -374,6 +404,112 @@ function resetGame() {
   toast('Spiel zurückgesetzt.');
 }
 
+function confirmReset() {
+  askConfirm(
+    { title: 'Spiel zurücksetzen?', text: 'Alle Punkte werden auf 0 gesetzt und die Karten neu gemischt. Die Spieler bleiben.', ok: 'Zurücksetzen' },
+    resetGame,
+  );
+}
+
+// ---------- Aktionen: Kategorien, Einstellungen, eigene Karten ----------
+function openScreen(name) {
+  pauseRunning();
+  state.screen = name;
+  render();
+  window.scrollTo(0, 0);
+}
+
+function toggleCategory(id) {
+  const on = settings.categories.includes(id);
+  if (on && settings.categories.length === 1) {
+    toast('Mindestens eine Kategorie muss an sein.');
+    return;
+  }
+  settings.categories = on ? settings.categories.filter((c) => c !== id) : [...settings.categories, id];
+  saveSettings();
+  render();
+}
+
+function changeTimer(direction) {
+  const next = settings.timerSeconds + direction * TIMER_STEP;
+  settings.timerSeconds = Math.min(TIMER_MAX, Math.max(TIMER_MIN, next));
+  saveSettings();
+  render();
+}
+
+function setToggle(key, value) {
+  settings[key] = value;
+  saveSettings();
+  render();
+}
+
+function testFeedback() {
+  unlockAudio();
+  sounds.timeUp();
+  vibrate([200, 100, 200]);
+}
+
+/** Liest eine Ganzzahl aus einem Eingabefeld; leer → null. */
+function readInt(id) {
+  const raw = $(id).value.trim();
+  return raw === '' ? null : Number(raw);
+}
+
+function addCustomCard(event) {
+  event.preventDefault();
+  const text = $('card-text').value.trim().replace(/\s+/g, ' ');
+  const unit = $('card-unit').value.trim();
+  const start = readInt('card-start');
+  const step = readInt('card-step');
+  const proof = readInt('card-proof');
+
+  const problem =
+    (!text && 'Bitte eine Challenge eingeben.') ||
+    (!unit && 'Bitte eine Einheit eingeben (z. B. „Sekunden“).') ||
+    ((!Number.isInteger(start) || start < 1) && 'Startwert muss eine ganze Zahl ab 1 sein.') ||
+    ((!Number.isInteger(step) || step < 1) && 'Schritt muss eine ganze Zahl ab 1 sein.') ||
+    (proof !== null && (!Number.isInteger(proof) || proof < 5 || proof > 600) && 'Beweiszeit: 5 bis 600 Sekunden oder leer lassen.');
+  if (problem) {
+    $('card-error').textContent = problem;
+    $('card-error').hidden = false;
+    return;
+  }
+
+  const card = {
+    id: `c${Date.now().toString(36)}`,
+    category: $('card-category').value,
+    text,
+    unit,
+    start,
+    step,
+  };
+  if (proof !== null) card.proofSeconds = proof;
+  customCards.push(card);
+  save('customCards', customCards);
+
+  $('form-card').reset();
+  $('card-category').value = card.category; // Kategorie für die nächste Karte beibehalten
+  $('card-error').hidden = true;
+  if (!settings.categories.includes(card.category)) {
+    toast('Gespeichert – Kategorie ist aber gerade ausgeschaltet.');
+  } else {
+    toast('Karte gespeichert!');
+  }
+  render();
+}
+
+function deleteCustomCard(id) {
+  const card = customCards.find((c) => c.id === id);
+  askConfirm({ title: 'Karte löschen?', text: `„${card.text}“`, ok: 'Löschen' }, () => {
+    customCards = customCards.filter((c) => c.id !== id);
+    save('customCards', customCards);
+    // Lief die gelöschte Karte gerade? Dann ist die Runde vorbei.
+    if (state.round && state.round.cardId === id) state.round = null;
+    state.deck = state.deck.filter((d) => d !== id);
+    render();
+  });
+}
+
 // ---------- Dialoge ----------
 let resumeAfterDialogMs = null;
 
@@ -435,6 +571,11 @@ function showScreen(id) {
 
 function render() {
   saveGame(); // jede Änderung landet sofort im Speicher
+  if (state.screen === 'settings' || state.screen === 'cards') {
+    state.screen === 'settings' ? renderSettings() : renderCards();
+    showScreen(`screen-${state.screen}`);
+    return;
+  }
   if (state.screen === 'start' || !state.round) {
     renderStart();
     showScreen('screen-start');
@@ -458,6 +599,53 @@ function renderStart() {
       const remove = el('button', { text: '×', attrs: { type: 'button', 'aria-label': `${p.name} entfernen` } });
       remove.addEventListener('click', () => removePlayer(p.id));
       return el('li', { className: 'player-chip' }, [el('span', { text: p.name }), remove]);
+    }),
+  );
+
+  $('category-toggles').replaceChildren(
+    ...CATEGORIES.map((cat) => {
+      const count = allCards().filter((c) => c.category === cat.id).length;
+      const on = settings.categories.includes(cat.id);
+      const b = el('button', { className: 'cat-toggle', attrs: { type: 'button', 'aria-pressed': String(on) } }, [
+        el('span', { className: 'emoji', text: cat.emoji }),
+        el('span', { text: cat.name }),
+        el('small', { text: `${count} Karten` }),
+      ]);
+      b.addEventListener('click', () => toggleCategory(cat.id));
+      return b;
+    }),
+  );
+}
+
+function renderSettings() {
+  $('timer-setting').textContent = `${settings.timerSeconds} s`;
+  $('btn-timer-down').disabled = settings.timerSeconds <= TIMER_MIN;
+  $('btn-timer-up').disabled = settings.timerSeconds >= TIMER_MAX;
+  $('toggle-sound').checked = settings.sound;
+  $('toggle-vibration').checked = settings.vibration;
+  $('vibration-note').hidden = 'vibrate' in navigator;
+}
+
+function renderCards() {
+  const select = $('card-category');
+  if (select.options.length === 0) {
+    CATEGORIES.forEach((c) => select.append(el('option', { text: `${c.emoji} ${c.name}`, attrs: { value: c.id } })));
+  }
+  $('custom-count').textContent = customCards.length ? `(${customCards.length})` : '';
+  $('custom-empty').hidden = customCards.length > 0;
+  $('custom-list').replaceChildren(
+    ...customCards.map((card) => {
+      const meta = [categoryLabel(card.category), `ab ${card.start} ${card.unit}`, `+${card.step}`];
+      if (card.proofSeconds) meta.push(`${card.proofSeconds} s Beweis`);
+      const del = el('button', { className: 'icon-btn', text: '🗑', attrs: { type: 'button', 'aria-label': 'Karte löschen' } });
+      del.addEventListener('click', () => deleteCustomCard(card.id));
+      return el('li', {}, [
+        el('div', { className: 'info' }, [
+          el('div', { className: 'text', text: card.text }),
+          el('div', { className: 'meta', text: meta.join(' · ') }),
+        ]),
+        del,
+      ]);
     }),
   );
 }
@@ -487,7 +675,7 @@ function renderBid() {
   $('btn-skip').classList.toggle('invisible', !waiting);
   $('btn-skip').disabled = !waiting;
 
-  renderTimer(bidTimer.running ? bidTimer.remaining() : state.round.pausedMs ?? BID_SECONDS * 1000);
+  renderTimer(bidTimer.running ? bidTimer.remaining() : state.round.pausedMs ?? bidMs());
 }
 
 function renderTimer(ms) {
@@ -502,7 +690,7 @@ function renderTimer(ms) {
   timer.classList.toggle('is-paused', paused);
   timer.classList.toggle('is-urgent', bidTimer.running && seconds <= 5);
   $('timer-value').textContent = seconds;
-  $('timer-fill').style.transform = `scaleX(${ms / (BID_SECONDS * 1000)})`;
+  $('timer-fill').style.transform = `scaleX(${Math.min(1, ms / bidMs())})`;
   $('timer-caption').textContent = waiting
     ? 'Startet mit dem ersten Gebot'
     : paused
@@ -612,12 +800,18 @@ function bindEvents() {
   $('form-player').addEventListener('submit', addPlayer);
   $('btn-scores').addEventListener('click', openScores);
   $('btn-scores-start').addEventListener('click', openScores);
-  $('btn-reset').addEventListener('click', () =>
-    askConfirm(
-      { title: 'Spiel zurücksetzen?', text: 'Alle Punkte werden auf 0 gesetzt und die Karten neu gemischt. Die Spieler bleiben.', ok: 'Zurücksetzen' },
-      resetGame,
-    ),
-  );
+  $('btn-reset').addEventListener('click', confirmReset);
+  $('btn-reset-settings').addEventListener('click', confirmReset);
+
+  $('btn-open-settings').addEventListener('click', () => openScreen('settings'));
+  $('btn-open-cards').addEventListener('click', () => openScreen('cards'));
+  document.querySelectorAll('[data-home]').forEach((b) => b.addEventListener('click', goHome));
+  $('btn-timer-down').addEventListener('click', () => changeTimer(-1));
+  $('btn-timer-up').addEventListener('click', () => changeTimer(1));
+  $('toggle-sound').addEventListener('change', (e) => setToggle('sound', e.target.checked));
+  $('toggle-vibration').addEventListener('change', (e) => setToggle('vibration', e.target.checked));
+  $('btn-test-sound').addEventListener('click', testFeedback);
+  $('form-card').addEventListener('submit', addCustomCard);
   $('btn-confirm-ok').addEventListener('click', () => {
     $('dlg-confirm').close();
     onConfirm?.();
@@ -637,6 +831,8 @@ function bindEvents() {
   });
 }
 
+setSoundEnabled(settings.sound);
+setVibrationEnabled(settings.vibration);
 restoreGame();
 bindEvents();
 render();

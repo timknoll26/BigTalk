@@ -82,3 +82,23 @@ Sicherheitsabfrage. Alles bleibt nach dem Neuladen erhalten.
 - **Wiederherstellen nach Neuladen:** `restoreGame()` lädt den gespeicherten Stand. Ein Timer, der lief, steht
   danach auf Pause (siehe ENTSCHEIDUNGEN Nr. 4).
 - **Punkteregeln ändern:** In `js/scoring.js` z. B. `fail: () => 0` eintragen, dann gibt es keinen Abzug mehr.
+
+---
+
+## Etappe 4 – Kategorien, eigene Karten, Einstellungen
+
+**Was:** Kategorie-Schalter auf dem Startbildschirm, ein Bildschirm für Einstellungen (Timer-Länge, Ton,
+Vibration) und einer für eigene Karten (anlegen, löschen).
+
+**Konzepte:**
+- **Objekte zusammenführen (Spread):** `{ ...DEFAULT_SETTINGS, ...load('settings', {}) }` nimmt erst alle
+  Standardwerte und überschreibt sie mit den gespeicherten. Kommt später eine neue Einstellung dazu, hat sie
+  automatisch ihren Standardwert.
+- **Arrays filtern:** `allCards().filter((c) => settings.categories.includes(c.category))` behält nur Karten
+  der eingeschalteten Kategorien. `filter`, `map`, `some`, `find` sind die Werkzeuge für Listen.
+- **Formular prüfen (Validierung):** `addCustomCard` prüft jedes Feld und zeigt den ersten Fehler an.
+  `novalidate` am `<form>` schaltet die kleinen Browser-Sprechblasen ab, damit unsere Meldung erscheint.
+- **`aria-pressed`:** Sagt Screenreadern, ob ein Schalter-Button an oder aus ist. CSS nutzt dasselbe Attribut
+  fürs Aussehen (`.cat-toggle[aria-pressed="true"]`). So stimmen Optik und Zugänglichkeit immer überein.
+- **Checkbox als Kippschalter:** `.switch` ist eine normale `<input type="checkbox">`, nur per CSS umgestaltet
+  (`appearance: none` + `::after` für den Knopf).

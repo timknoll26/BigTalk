@@ -129,3 +129,20 @@ Bildschirm bleibt während des Spiels an.
 - **`env(safe-area-inset-…)`:** Abstand zur iPhone-Notch und zur Home-Leiste, damit nichts verdeckt wird.
 
 **Werkzeug:** `tools/handy-vorschau.html?w=375&h=667` simuliert andere Bildschirmgrößen.
+
+---
+
+## Etappe 6 – Veröffentlichen mit GitHub Pages
+
+**Was:** Die Seite ist live unter **https://timknoll26.github.io/BigTalk/**.
+
+**Konzepte:**
+- **GitHub Pages:** GitHub liefert die Dateien aus dem `main`-Branch direkt als Webseite aus, mit HTTPS.
+  Jeder `git push` auf `main` aktualisiert die Seite nach etwa einer Minute. Bei kostenlosen Konten muss das
+  Repo dafür öffentlich sein.
+- **Relative Pfade:** Die Seite liegt nicht unter `/`, sondern unter `/BigTalk/`. Darum stehen überall
+  relative Pfade (`style.css`, `js/app.js`, `"start_url": "./"`) statt `/style.css`. Sonst würde der Browser
+  die Dateien unter `timknoll26.github.io/style.css` suchen und nicht finden.
+- **Ablauf einer Änderung:** Datei ändern → lokal testen → `git add` → `git commit -m "…"` → `git push`.
+  Am Handy erscheint die neue Version beim übernächsten Öffnen (der Service Worker lädt sie beim ersten
+  Öffnen im Hintergrund).

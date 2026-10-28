@@ -61,3 +61,24 @@ siehst du die Seite in Handygröße.
   schnelle Tipp ginge daneben. Diesen Fehler hat der Test in Etappe 2 gefunden.
 
 **Werkzeug:** `tools/handy-vorschau.html` zeigt das Spiel in Handygröße (390×844) im normalen Browserfenster.
+
+---
+
+## Etappe 3 – Spieler, Punkte, localStorage
+
+**Was:** Optional Spieler anlegen, Höchstbieter nach Ablauf wählen, ±1 Punkt, Rangliste, Zurücksetzen mit
+Sicherheitsabfrage. Alles bleibt nach dem Neuladen erhalten.
+
+**Konzepte:**
+- **localStorage:** Ein kleiner Speicher im Browser, nur für diese Webseite. Er bleibt auch nach dem Schließen
+  erhalten. Er speichert nur Text, daher `JSON.stringify(objekt)` → Text und `JSON.parse(text)` → Objekt
+  (siehe `js/storage.js`). In Chrome siehst du ihn unter **F12 → Application → Local Storage**.
+- **try/catch:** Fängt Fehler ab. Wenn localStorage nicht geht (z. B. privater Modus), läuft das Spiel trotzdem.
+- **Elemente erzeugen:** Spielerlisten werden mit `document.createElement` gebaut (Hilfsfunktion `el()`).
+  Namen werden über `textContent` eingesetzt, nie über `innerHTML`. So kann ein Name wie `<b>Tim</b>` keinen
+  HTML-Code einschleusen.
+- **Formulare:** `<form>` mit `submit`-Event. Enter auf der Tastatur sendet das Formular ab.
+  `event.preventDefault()` verhindert, dass der Browser die Seite neu lädt.
+- **Wiederherstellen nach Neuladen:** `restoreGame()` lädt den gespeicherten Stand. Ein Timer, der lief, steht
+  danach auf Pause (siehe ENTSCHEIDUNGEN Nr. 4).
+- **Punkteregeln ändern:** In `js/scoring.js` z. B. `fail: () => 0` eintragen, dann gibt es keinen Abzug mehr.

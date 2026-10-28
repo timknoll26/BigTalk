@@ -2,15 +2,19 @@
 // und zeichnet den jeweils sichtbaren Bildschirm.
 //
 // Grundprinzip: Ein Event-Handler ändert `state` und ruft dann render() auf.
-// render() liest nur aus `state` und passt das HTML an.
+// render() speichert den Zustand und passt das HTML an.
 
 import { DEFAULT_CARDS, CATEGORIES } from './cards.js';
 import { drawCard } from './deck.js';
 import { Countdown } from './timer.js';
 import { sounds, unlockAudio } from './sound.js';
 import { vibrate } from './feedback.js';
+import { load, save } from './storage.js';
+import { scoreDelta, formatDelta } from './scoring.js';
 
 const BID_SECONDS = 15;
+const MAX_PLAYERS = 12;
+const NO_SCORE = 'none'; // bidderId, wenn bewusst ohne Wertung gespielt wird
 
 // ---------- Zustand ----------
 const state = {
@@ -19,9 +23,12 @@ const state = {
   lastCardId: null,
   // Die laufende Runde (oder null):
   // { cardId, phase: 'bid'|'prove'|'result', bids: [], pausedMs: null|Zahl,
-  //   proofState: 'idle'|'running'|'done', success: null|true|false }
+  //   proofState: 'idle'|'running'|'done', bidderId: null|'none'|Spieler-ID,
+  //   success: null|true|false, delta: null|Zahl }
   round: null,
 };
+
+let players = load('players', []); // [{ id, name, score }]
 
 // ---------- Hilfsfunktionen ----------
 const $ = (id) => document.getElementById(id);
@@ -30,8 +37,12 @@ function allCards() {
   return DEFAULT_CARDS;
 }
 
+function findCard(id) {
+  return allCards().find((c) => c.id === id);
+}
+
 function currentCard() {
-  return state.round && allCards().find((c) => c.id === state.round.cardId);
+  return state.round && findCard(state.round.cardId);
 }
 
 function currentBid() {
@@ -45,18 +56,74 @@ function minNextBid(card) {
   return bid === null ? card.start : bid + card.step;
 }
 
+function findPlayer(id) {
+  return players.find((p) => p.id === id);
+}
+
 function categoryLabel(id) {
   const cat = CATEGORIES.find((c) => c.id === id);
   return cat ? `${cat.emoji} ${cat.name}` : id;
 }
 
+/** Erzeugt ein Element. Text immer über textContent, nie innerHTML – so kann ein Name kein HTML einschleusen. */
+function el(tag, { className, text, attrs } = {}, children = []) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  if (attrs) Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, v));
+  children.forEach((c) => node.append(c));
+  return node;
+}
+
 let toastTimeout = null;
 function toast(message) {
-  const el = $('toast');
-  el.textContent = message;
-  el.classList.add('show');
+  const box = $('toast');
+  box.textContent = message;
+  box.classList.add('show');
   clearTimeout(toastTimeout);
-  toastTimeout = setTimeout(() => el.classList.remove('show'), 2600);
+  toastTimeout = setTimeout(() => box.classList.remove('show'), 2600);
+}
+
+/** Startet eine CSS-Animation neu (Klasse weg, Reflow erzwingen, Klasse wieder dran). */
+function replayAnimation(node, className) {
+  node.classList.remove(className);
+  void node.offsetWidth;
+  node.classList.add(className);
+}
+
+// ---------- Speichern & Laden ----------
+function saveGame() {
+  save('game', {
+    screen: state.screen,
+    deck: state.deck,
+    lastCardId: state.lastCardId,
+    round: state.round,
+  });
+}
+
+function savePlayers() {
+  save('players', players);
+}
+
+/** Stellt nach dem Neuladen den letzten Stand her – laufende Timer werden zu Pausen. */
+function restoreGame() {
+  const saved = load('game', null);
+  if (!saved) return;
+  state.screen = saved.screen === 'game' ? 'game' : 'start';
+  state.deck = Array.isArray(saved.deck) ? saved.deck : [];
+  state.lastCardId = saved.lastCardId ?? null;
+  state.round = saved.round ?? null;
+
+  const r = state.round;
+  if (!r) return;
+  if (!findCard(r.cardId)) {
+    // Karte gibt es nicht mehr (z. B. eigene Karte gelöscht).
+    state.round = null;
+    state.screen = 'start';
+    return;
+  }
+  if (r.phase === 'bid' && r.bids.length > 0) r.pausedMs = BID_SECONDS * 1000;
+  if (r.phase === 'prove' && r.proofState === 'running') r.proofState = 'idle';
 }
 
 // ---------- Timer ----------
@@ -92,7 +159,7 @@ function startBidTimer(ms = BID_SECONDS * 1000) {
   bidTimer.start(ms);
 }
 
-// ---------- Aktionen ----------
+// ---------- Aktionen: Spielablauf ----------
 function startGame() {
   state.screen = 'game';
   if (!state.round) {
@@ -122,7 +189,9 @@ function nextCard() {
     bids: [],
     pausedMs: null,
     proofState: 'idle',
+    bidderId: null,
     success: null,
+    delta: null,
   };
   state.screen = 'game';
   render();
@@ -134,11 +203,7 @@ function placeBid(value) {
   sounds.bid();
   vibrate(25);
   render();
-  // Animation neu auslösen: Klasse entfernen, Reflow erzwingen, wieder setzen.
-  const el = $('bid-value');
-  el.classList.remove('bump');
-  void el.offsetWidth;
-  el.classList.add('bump');
+  replayAnimation($('bid-value'), 'bump');
 }
 
 /** Erhöht um `steps` Mindestschritte. Das erste Gebot ist immer mindestens der Startwert. */
@@ -204,14 +269,24 @@ function onBidTimeUp() {
   const r = state.round;
   r.phase = 'prove';
   r.proofState = 'idle';
+  r.bidderId = null;
   sounds.timeUp();
   vibrate([500, 150, 500, 150, 800]);
   render();
   // Wackel-Animation nur beim echten Ablauf, nicht beim Zurückkehren.
-  const screen = $('screen-prove');
-  screen.classList.remove('alarm');
-  void screen.offsetWidth;
-  screen.classList.add('alarm');
+  replayAnimation($('screen-prove'), 'alarm');
+}
+
+function chooseBidder(id) {
+  state.round.bidderId = id;
+  render();
+}
+
+function changeBidder() {
+  if (proofTimer.running) return; // während des Beweises nicht umentscheiden
+  state.round.bidderId = null;
+  state.round.proofState = 'idle';
+  render();
 }
 
 function startProof() {
@@ -226,14 +301,80 @@ function startProof() {
 function finishRound(success) {
   proofTimer.stop();
   const r = state.round;
+  const card = currentCard();
   r.success = success;
   r.phase = 'result';
+  r.delta = null;
+
+  const player = findPlayer(r.bidderId);
+  if (player) {
+    r.delta = scoreDelta(success, { bid: currentBid(), card });
+    player.score += r.delta;
+    savePlayers();
+  }
   success ? sounds.success() : sounds.fail();
   vibrate(success ? [80, 60, 80] : 400);
   render();
 }
 
-// ---------- Direkteingabe ----------
+/** Falls aus Versehen der falsche Ergebnis-Button getippt wurde. */
+function revertResult() {
+  const r = state.round;
+  const player = findPlayer(r.bidderId);
+  if (player && r.delta !== null) {
+    player.score -= r.delta;
+    savePlayers();
+  }
+  r.success = null;
+  r.delta = null;
+  r.phase = 'prove';
+  r.proofState = 'idle';
+  render();
+}
+
+// ---------- Aktionen: Spieler & Punkte ----------
+function addPlayer(event) {
+  event.preventDefault();
+  const input = $('input-player');
+  const name = input.value.trim().replace(/\s+/g, ' ');
+  const error = (msg) => {
+    $('player-error').textContent = msg;
+    $('player-error').hidden = false;
+  };
+  if (!name) return error('Bitte einen Namen eingeben.');
+  if (players.length >= MAX_PLAYERS) return error(`Höchstens ${MAX_PLAYERS} Spieler.`);
+  if (players.some((p) => p.name.toLowerCase() === name.toLowerCase())) return error(`„${name}“ gibt es schon.`);
+
+  players.push({ id: `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, name, score: 0 });
+  savePlayers();
+  input.value = '';
+  $('player-error').hidden = true;
+  render();
+  input.focus(); // gleich den nächsten Namen tippen
+}
+
+function removePlayer(id) {
+  players = players.filter((p) => p.id !== id);
+  savePlayers();
+  if (state.round && state.round.bidderId === id && state.round.phase === 'prove') state.round.bidderId = null;
+  render();
+}
+
+function resetGame() {
+  bidTimer.stop();
+  proofTimer.stop();
+  players.forEach((p) => (p.score = 0));
+  savePlayers();
+  state.deck = [];
+  state.lastCardId = null;
+  state.round = null;
+  state.screen = 'start';
+  $('dlg-scores').close();
+  render();
+  toast('Spiel zurückgesetzt.');
+}
+
+// ---------- Dialoge ----------
 let resumeAfterDialogMs = null;
 
 function openBidDialog() {
@@ -262,23 +403,38 @@ function submitBidDialog(event) {
   const value = Number($('input-bid').value);
   const min = minNextBid(card);
   if (!Number.isInteger(value) || value < min) {
-    const err = $('bid-error');
-    err.textContent = `Mindestens ${min} ${card.unit}.`;
-    err.hidden = false;
+    $('bid-error').textContent = `Mindestens ${min} ${card.unit}.`;
+    $('bid-error').hidden = false;
     return;
   }
   closeBidDialog(true);
   placeBid(value);
 }
 
+function openScores() {
+  renderScoreboard($('scores-list'));
+  $('scores-empty').hidden = players.length > 0;
+  $('dlg-scores').showModal();
+}
+
+let onConfirm = null;
+function askConfirm({ title, text, ok }, action) {
+  $('confirm-title').textContent = title;
+  $('confirm-text').textContent = text;
+  $('btn-confirm-ok').textContent = ok;
+  onConfirm = action;
+  $('dlg-confirm').showModal();
+}
+
 // ---------- Darstellung ----------
 function showScreen(id) {
-  document.querySelectorAll('.screen').forEach((el) => {
-    el.classList.toggle('active', el.id === id);
+  document.querySelectorAll('.screen').forEach((s) => {
+    s.classList.toggle('active', s.id === id);
   });
 }
 
 function render() {
+  saveGame(); // jede Änderung landet sofort im Speicher
   if (state.screen === 'start' || !state.round) {
     renderStart();
     showScreen('screen-start');
@@ -293,6 +449,17 @@ function render() {
 
 function renderStart() {
   $('btn-start').textContent = state.round ? 'Weiterspielen' : "Los geht's";
+  $('btn-scores-start').hidden = players.length === 0;
+  $('players-count').textContent = players.length ? `(${players.length})` : '– optional';
+
+  const list = $('players-list');
+  list.replaceChildren(
+    ...players.map((p) => {
+      const remove = el('button', { text: '×', attrs: { type: 'button', 'aria-label': `${p.name} entfernen` } });
+      remove.addEventListener('click', () => removePlayer(p.id));
+      return el('li', { className: 'player-chip' }, [el('span', { text: p.name }), remove]);
+    }),
+  );
 }
 
 function renderBid() {
@@ -302,6 +469,7 @@ function renderBid() {
 
   $('bid-category').textContent = categoryLabel(card.category);
   $('bid-card').textContent = card.text;
+  $('btn-scores').hidden = players.length === 0;
 
   const value = String(waiting ? card.start : bid);
   const valueEl = $('bid-value');
@@ -345,26 +513,47 @@ function renderTimer(ms) {
 function renderProve() {
   const card = currentCard();
   const r = state.round;
+  // Wurde der gewählte Bieter inzwischen gelöscht? Dann neu wählen.
+  if (r.bidderId && r.bidderId !== NO_SCORE && !findPlayer(r.bidderId)) r.bidderId = null;
+
   $('prove-value').textContent = currentBid();
   $('prove-unit').textContent = card.unit;
   $('prove-card').textContent = card.text;
 
+  const needPick = players.length > 0 && r.bidderId === null;
+  $('prove-bidder').hidden = !needPick;
+  if (needPick) {
+    $('bidder-buttons').replaceChildren(
+      ...players.map((p) => {
+        const b = el('button', { className: 'btn btn-ghost', text: p.name, attrs: { type: 'button' } });
+        b.addEventListener('click', () => chooseBidder(p.id));
+        return b;
+      }),
+    );
+  }
+
+  const who = $('prove-who');
+  who.hidden = players.length === 0 || needPick;
+  const bidder = findPlayer(r.bidderId);
+  who.textContent = bidder ? `🎤 ${bidder.name} muss liefern` : 'Ohne Wertung · ändern';
+
   const hasProofTimer = Boolean(card.proofSeconds);
-  $('proof-timer').hidden = !hasProofTimer;
+  $('proof-timer').hidden = needPick || !hasProofTimer;
   if (hasProofTimer) {
     $('btn-proof-start').hidden = r.proofState !== 'idle';
     renderProofTime(r.proofState === 'running' ? proofTimer.remaining() : card.proofSeconds * 1000);
   }
+  $('verdict').hidden = needPick;
 }
 
 function renderProofTime(ms) {
   const r = state.round;
-  const el = $('proof-time');
+  const box = $('proof-time');
   const done = r.proofState === 'done';
   const seconds = Math.ceil(ms / 1000);
-  el.textContent = done ? 'Zeit um!' : `${seconds} s`;
-  el.classList.toggle('is-done', done);
-  el.classList.toggle('is-urgent', r.proofState === 'running' && seconds <= 5);
+  box.textContent = done ? 'Zeit um!' : `${seconds} s`;
+  box.classList.toggle('is-done', done);
+  box.classList.toggle('is-urgent', r.proofState === 'running' && seconds <= 5);
 }
 
 function renderResult() {
@@ -375,6 +564,28 @@ function renderResult() {
   title.textContent = r.success ? 'Geschafft!' : 'Nicht geschafft!';
   title.className = `result-title ${r.success ? 'win' : 'lose'}`;
   $('result-detail').textContent = `${currentBid()} ${card.unit}`;
+
+  const player = findPlayer(r.bidderId);
+  const points = $('result-points');
+  points.textContent = player && r.delta !== null ? `${player.name} ${formatDelta(r.delta)}` : '';
+  points.className = `result-points ${r.delta > 0 ? 'win' : 'lose'}`;
+  renderScoreboard($('result-scores'), player?.id);
+}
+
+/** Rangliste; bei Gleichstand teilen sich Spieler den Platz. */
+function renderScoreboard(list, highlightId = null) {
+  const sorted = players.slice().sort((a, b) => b.score - a.score);
+  list.replaceChildren(
+    ...sorted.map((p) => {
+      const rank = 1 + sorted.filter((o) => o.score > p.score).length;
+      const classes = [rank === 1 ? 'leader' : '', p.id === highlightId ? 'highlight' : ''].join(' ').trim();
+      return el('li', { className: classes }, [
+        el('span', { className: 'rank', text: rank === 1 ? '👑' : `${rank}.` }),
+        el('span', { className: 'name', text: p.name }),
+        el('span', { className: 'score', text: p.score }),
+      ]);
+    }),
+  );
 }
 
 // ---------- Events verbinden ----------
@@ -390,10 +601,28 @@ function bindEvents() {
   $('btn-skip').addEventListener('click', skipCard);
   $('timer').addEventListener('click', togglePause);
   $('bid-display').addEventListener('click', openBidDialog);
+  $('btn-no-score').addEventListener('click', () => chooseBidder(NO_SCORE));
+  $('prove-who').addEventListener('click', changeBidder);
   $('btn-proof-start').addEventListener('click', startProof);
   $('btn-success').addEventListener('click', () => finishRound(true));
   $('btn-fail').addEventListener('click', () => finishRound(false));
   $('btn-next').addEventListener('click', nextCard);
+  $('btn-revert').addEventListener('click', revertResult);
+
+  $('form-player').addEventListener('submit', addPlayer);
+  $('btn-scores').addEventListener('click', openScores);
+  $('btn-scores-start').addEventListener('click', openScores);
+  $('btn-reset').addEventListener('click', () =>
+    askConfirm(
+      { title: 'Spiel zurücksetzen?', text: 'Alle Punkte werden auf 0 gesetzt und die Karten neu gemischt. Die Spieler bleiben.', ok: 'Zurücksetzen' },
+      resetGame,
+    ),
+  );
+  $('btn-confirm-ok').addEventListener('click', () => {
+    $('dlg-confirm').close();
+    onConfirm?.();
+    onConfirm = null;
+  });
 
   $('form-bid').addEventListener('submit', submitBidDialog);
   $('dlg-bid').querySelector('[data-close]').addEventListener('click', () => closeBidDialog(false));
@@ -402,7 +631,12 @@ function bindEvents() {
     e.preventDefault();
     closeBidDialog(false);
   });
+  // Alle anderen Dialoge: [data-close]-Buttons schließen einfach.
+  ['dlg-scores', 'dlg-confirm'].forEach((id) => {
+    $(id).querySelector('[data-close]').addEventListener('click', () => $(id).close());
+  });
 }
 
+restoreGame();
 bindEvents();
 render();

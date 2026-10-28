@@ -23,6 +23,19 @@
       <p class="tagline">Große Klappe? Beweis es!</p>
 
       <button id="btn-start" class="btn btn-primary btn-xl" type="button">Los geht's</button>
+      <button id="btn-scores-start" class="btn btn-ghost" type="button">🏆 Punktestand</button>
+
+      <details id="panel-players" class="panel">
+        <summary>Spieler <span id="players-count" class="count"></span></summary>
+        <p class="hint">Optional – nur für den Punktestand. Ohne Spieler wird ohne Punkte gespielt.</p>
+        <ul id="players-list" class="players-list"></ul>
+        <form id="form-player" class="inline-form" novalidate>
+          <input id="input-player" type="text" maxlength="16" placeholder="Name eingeben"
+                 autocomplete="off" autocapitalize="words" enterkeyhint="done" aria-label="Spielername">
+          <button class="btn btn-primary" type="submit" aria-label="Spieler hinzufügen">+</button>
+        </form>
+        <p id="player-error" class="form-error" hidden></p>
+      </details>
 
       <details class="panel">
         <summary>Kurzregeln</summary>
@@ -41,6 +54,7 @@
         <button id="btn-home" class="icon-btn" type="button" aria-label="Zum Startbildschirm">←</button>
         <span id="bid-category" class="chip"></span>
         <span class="topbar-spacer"></span>
+        <button id="btn-scores" class="icon-btn" type="button" aria-label="Punktestand">🏆</button>
       </header>
 
       <p id="bid-card" class="card-text"></p>
@@ -75,6 +89,14 @@
       </div>
       <p id="prove-card" class="card-text card-text-small"></p>
 
+      <!-- Nur mit Spielern: Wer muss liefern? -->
+      <div id="prove-bidder" class="bidder-pick">
+        <p class="bidder-question">Wer hat am höchsten geboten?</p>
+        <div id="bidder-buttons" class="bidder-buttons"></div>
+        <button id="btn-no-score" class="btn btn-link" type="button">Ohne Wertung weiter</button>
+      </div>
+      <button id="prove-who" class="prove-who" type="button" aria-label="Höchstbieter ändern"></button>
+
       <div id="proof-timer" class="proof-timer">
         <span id="proof-time" class="proof-time"></span>
         <button id="btn-proof-start" class="btn btn-primary btn-xl" type="button">▶ Beweis starten</button>
@@ -91,7 +113,10 @@
       <div id="result-icon" class="result-icon"></div>
       <h2 id="result-title" class="result-title"></h2>
       <p id="result-detail" class="result-detail"></p>
+      <p id="result-points" class="result-points"></p>
+      <ol id="result-scores" class="scoreboard"></ol>
       <button id="btn-next" class="btn btn-primary btn-xl" type="button">Nächste Karte</button>
+      <button id="btn-revert" class="btn btn-link" type="button">Falsch getippt? Ergebnis ändern</button>
     </section>
 
   </main>
@@ -107,6 +132,27 @@
         <button class="btn btn-primary" type="submit">Bieten</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Punktestand -->
+  <dialog id="dlg-scores" class="dialog">
+    <h3>🏆 Punktestand</h3>
+    <ol id="scores-list" class="scoreboard"></ol>
+    <p id="scores-empty" class="hint" hidden>Noch keine Spieler. Füge auf dem Startbildschirm welche hinzu.</p>
+    <div class="dialog-actions">
+      <button id="btn-reset" class="btn btn-ghost" type="button">Spiel zurücksetzen</button>
+      <button class="btn btn-primary" type="button" data-close>Schließen</button>
+    </div>
+  </dialog>
+
+  <!-- Sicherheitsabfrage (statt window.confirm, damit es zum Design passt) -->
+  <dialog id="dlg-confirm" class="dialog">
+    <h3 id="confirm-title"></h3>
+    <p id="confirm-text"></p>
+    <div class="dialog-actions">
+      <button class="btn btn-ghost" type="button" data-close>Abbrechen</button>
+      <button id="btn-confirm-ok" class="btn btn-fail" type="button"></button>
+    </div>
   </dialog>
 
   <!-- Kurze Hinweise unten am Rand -->

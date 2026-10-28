@@ -58,3 +58,27 @@ Kurzprotokoll: **was** entschieden wurde, **warum**, und welche Alternative verw
 - Warum: Eine Stelle für die Anzeige, weniger „vergessene“ Aktualisierungen. Das ist die Grundidee hinter
   Frameworks wie React – hier von Hand und klein.
 - Verworfen: Jeder Handler ändert passende DOM-Elemente selbst – schnell unübersichtlich.
+
+## Etappe 3 – Spieler, Punkte, Speichern
+
+**10. Höchstbieter wird erst nach Ablauf gewählt, nicht bei jedem Gebot**
+- Gewählt: Nach „Beweis es!“ tippt man einmal auf den Namen.
+- Warum: Bei Lärm und schnellen Geboten ist „+“ das Einzige, was man zuverlässig schafft. Namen pro Gebot wären zu langsam.
+- Verworfen: Für jedes Gebot den Bieter antippen – genauer, aber auf einer Party unbedienbar.
+
+**11. Punkteregeln als Funktionen in `scoring.js`**
+- Gewählt: `SCORING_RULES = { success: () => 1, fail: () => -1 }`. Die Funktionen bekommen Gebot und Karte mit.
+- Warum: Spätere Regeln („Punkte = Höhe des Gebots“, „kein Abzug“) sind eine Zeile, ohne `app.js` anzufassen.
+- Verworfen: Feste Zahlen `+1/−1` direkt in `app.js` – schnell, aber verstreut und schwer änderbar.
+
+**12. Speichern bei jedem `render()`**
+- Gewählt: `render()` ruft zuerst `saveGame()` auf. Spieler werden bei jeder Punkteänderung gespeichert.
+- Warum: Jede Zustandsänderung endet in `render()`. So kann kein Speichern vergessen werden. Die Datenmenge ist winzig.
+- Verworfen: An jeder Stelle einzeln speichern – fehleranfällig. Speichern im Timer-Takt – unnötig oft.
+
+**13. „Ergebnis ändern“ und „Ohne Wertung“**
+- Warum: Ein falscher Tipp auf „Geschafft“ passiert im Trubel. Ein Rückweg, der die Punkte zurückbucht, ist billiger als Streit.
+  „Ohne Wertung“ erlaubt Runden, in denen z. B. jemand mitspielt, der nicht in der Liste steht.
+
+**14. Eigene Bestätigungs-Dialoge statt `window.confirm()`**
+- Warum: Passen zum Design, große Buttons. `confirm()` sieht auf jedem Handy anders aus und ist winzig.

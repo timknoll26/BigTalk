@@ -29,3 +29,35 @@ siehst du die Seite in Handygröße.
   Datei etwas frei, mit `import` holt sich eine andere Datei das.
 - **Zustand (State):** Alles, was das Spiel „weiß“ (welche Karte, welches Gebot, welche Phase), steht in einem
   JavaScript-Objekt. Die Anzeige wird daraus berechnet. Ändert sich der Zustand, wird neu gezeichnet.
+
+---
+
+## Etappe 2 – Kern-Spielschleife
+
+**Was:** Karte ziehen → bieten → Timer → „Beweis es!“ → Geschafft/Nicht geschafft → nächste Karte.
+
+**Wo steht was?**
+- `index.html`: Jeder Bildschirm ist eine `<section class="screen">`. Nur die mit Klasse `active` ist sichtbar.
+- `js/app.js`: Der `state` (Zustand) und alle Aktionen (`raise`, `undo`, `onBidTimeUp`, `finishRound` …).
+- `js/deck.js`, `js/timer.js`, `js/sound.js`, `js/feedback.js`: kleine Helfer mit je einer Aufgabe.
+
+**Konzepte:**
+- **DOM (Document Object Model):** Der Browser macht aus dem HTML einen Baum von Objekten. Mit
+  `document.getElementById('bid-value')` holt JavaScript sich ein Element und ändert z. B. `textContent`.
+  In `app.js` ist `$` eine Abkürzung dafür.
+- **Events:** `button.addEventListener('click', raise)` heißt: „Wenn jemand tippt, rufe `raise` auf.“
+  Alle Verknüpfungen stehen gesammelt in `bindEvents()`.
+- **CSS-Klassen als Schalter:** JavaScript setzt nur Klassen (`is-urgent`, `is-waiting`), das Aussehen
+  steht in `style.css`. `classList.toggle('is-urgent', bedingung)` schaltet die Klasse an oder aus.
+- **Timer mit Zeitstempel:** `Countdown` merkt sich *wann* die Zeit abläuft (`endsAt`) und rechnet alle 100 ms
+  `endsAt - Date.now()` aus. `setInterval(fn, 100)` ruft `fn` alle 100 ms auf, `clearInterval` beendet das.
+- **Mischen (Fisher-Yates):** `deck.js` mischt die Karten-IDs einmal. Gezogen wird von vorne. Erst wenn die Liste
+  leer ist, wird neu gemischt. So kommt keine Karte doppelt, bevor alle dran waren.
+- **Web Audio API:** `sound.js` erzeugt Töne mit einem *Oszillator* (Tonerzeuger mit Frequenz in Hertz) und
+  einem *Gain* (Lautstärkeregler). Browser erlauben Ton erst nach dem ersten Tippen, daher `unlockAudio()`.
+- **`<dialog>`:** Eingebautes HTML-Element für Pop-ups. `showModal()` öffnet es und sperrt den Rest der Seite.
+- **Layout ohne Springen:** „Karte überspringen“ wird nach dem ersten Gebot nur *unsichtbar*
+  (`visibility: hidden`), nicht entfernt. Sonst würde der Plus-Button nach oben rutschen, und der nächste
+  schnelle Tipp ginge daneben. Diesen Fehler hat der Test in Etappe 2 gefunden.
+
+**Werkzeug:** `tools/handy-vorschau.html` zeigt das Spiel in Handygröße (390×844) im normalen Browserfenster.
